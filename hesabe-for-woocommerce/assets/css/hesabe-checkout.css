@@ -1,0 +1,80 @@
+/**
+ * Direct mode — card-style brand selection (aligned with classic Hesabe direct plugin UX).
+ */
+
+.hesabe-direct-brands {
+	margin: 1em 0 0;
+	padding: 0;
+	border: 0;
+}
+
+.hesabe-direct-brands__title {
+	margin: 0 0 0.65rem;
+	font-size: 0.95em;
+	font-weight: 600;
+}
+
+.hesabe-direct-brands__list {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.hesabe-brand-card {
+	display: flex;
+	align-items: center;
+	gap: 0.75rem;
+	margin: 0 0 0.5rem;
+	padding: 0.65rem 0.75rem;
+	border: 1px solid #d0d0d0;
+	border-radius: 6px;
+	cursor: pointer;
+	background: #fff;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.hesabe-brand-card:hover {
+	border-color: #a0a0a0;
+}
+
+.hesabe-brand-card.hesabe-brand-card--selected,
+.hesabe-brand-card:has( input[type="radio"]:focus-visible ) {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	background: #f0f6fc;
+}
+
+.hesabe-brand-card input[type="radio"] {
+	margin: 0;
+	flex-shrink: 0;
+}
+
+.hesabe-brand-card__icon {
+	flex-shrink: 0;
+	width: 40px;
+	height: 28px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.hesabe-brand-card__icon svg {
+	display: block;
+	max-width: 100%;
+	height: auto;
+}
+
+.hesabe-brand-card__text {
+	font-size: 0.95em;
+	line-height: 1.3;
+}
+
+.hesabe-brand-card--unavailable {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+
+.hesabe-brand-card--unavailable .hesabe-apple-unavailable {
+	margin-left: 0.25rem;
+	font-size: 0.85em;
+}
