@@ -92,8 +92,10 @@ class Hesabe_WC_Blocks_Hesabe extends AbstractPaymentMethodType {
 			if ( ! empty( $s['direct_visa'] ) && 'yes' === $s['direct_visa'] ) {
 				$brands['visa'] = __( 'Visa / Mastercard', 'hesabe-for-woocommerce' );
 			}
-			if ( ! empty( $s['direct_apple'] ) && 'yes' === $s['direct_apple'] ) {
-				$brands['apple'] = __( 'Apple Pay', 'hesabe-for-woocommerce' );
+			$options = $this->apple_pay_type_options();
+			foreach ( $this->enabled_apple_pay_types( $s ) as $type ) {
+				$label = isset( $options[ $type ] ) ? $options[ $type ] : sprintf( __( 'Apple Pay (%s)', 'hesabe-for-woocommerce' ), $type );
+				$brands[ 'apple_' . $type ] = $label;
 			}
 		}
 
@@ -105,5 +107,69 @@ class Hesabe_WC_Blocks_Hesabe extends AbstractPaymentMethodType {
 			'brands'       => $brands,
 			'select_title' => __( 'Select a payment method', 'hesabe-for-woocommerce' ),
 		);
+	}
+
+	/**
+	 * Apple Pay paymentType labels.
+	 *
+	 * @return array<string, string>
+	 */
+	private function apple_pay_type_options() {
+		return array(
+			'9'  => __( 'MPGS Apple Pay', 'hesabe-for-woocommerce' ),
+			'10' => __( 'CYBS Apple Pay', 'hesabe-for-woocommerce' ),
+			'11' => __( 'KNET Debit Apple Pay', 'hesabe-for-woocommerce' ),
+			'12' => __( 'KNET Credit Apple Pay', 'hesabe-for-woocommerce' ),
+			'13' => __( 'KNET Apple Pay International', 'hesabe-for-woocommerce' ),
+			'14' => __( 'AMEX Apple Pay International', 'hesabe-for-woocommerce' ),
+		);
+	}
+
+	/**
+	 * Selected Apple Pay types from settings.
+	 * Supports multiselect key and legacy single-select fallback.
+	 *
+	 * @param array<string, mixed> $settings Gateway settings.
+	 * @return array<int, string>
+	 */
+	private function enabled_apple_pay_types( array $settings ) {
+		$allowed = array_keys( $this->apple_pay_type_options() );
+		$types   = array();
+
+		// New checkbox-based settings.
+		foreach ( $allowed as $type ) {
+			$key = 'apple_pay_type_' . $type;
+			if ( isset( $settings[ $key ] ) && 'yes' === $settings[ $key ] ) {
+				$types[] = $type;
+			}
+		}
+
+		$raw = isset( $settings['apple_pay_types'] ) ? $settings['apple_pay_types'] : array();
+
+		if ( is_string( $raw ) && '' !== $raw ) {
+			$raw = array_map( 'trim', explode( ',', $raw ) );
+		}
+
+		if ( is_array( $raw ) && ! empty( $raw ) ) {
+			foreach ( $raw as $value ) {
+				$type = preg_replace( '/[^0-9]/', '', (string) $value );
+				if ( in_array( $type, $allowed, true ) ) {
+					$types[] = $type;
+				}
+			}
+		}
+
+		if ( empty( $types ) ) {
+			$legacy = isset( $settings['apple_pay_type'] ) ? (string) $settings['apple_pay_type'] : '9';
+			if ( in_array( $legacy, $allowed, true ) ) {
+				$types[] = $legacy;
+			}
+		}
+
+		$types = array_values( array_unique( $types ) );
+		if ( empty( $types ) ) {
+			$types = array( '9' );
+		}
+		return $types;
 	}
 }

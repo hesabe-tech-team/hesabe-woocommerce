@@ -38,15 +38,19 @@
 	}
 
 	function filterBrands( brands ) {
-		if ( ! brands.apple ) {
-			return brands;
+		var keys = Object.keys( brands || {} );
+		var hasApple = keys.some( function ( k ) {
+			return k.indexOf( 'apple' ) === 0;
+		} );
+		if ( ! hasApple ) {
+			return brands || {};
 		}
 		if ( applePayAvailable() ) {
 			return brands;
 		}
 		var filtered = {};
 		Object.keys( brands ).forEach( function ( k ) {
-			if ( k !== 'apple' ) {
+			if ( k.indexOf( 'apple' ) !== 0 ) {
 				filtered[ k ] = brands[ k ];
 			}
 		} );
@@ -72,7 +76,7 @@
 				createElement( 'text', { x: 20, y: 16, textAnchor: 'middle', fill: '#fff', fontSize: 6.5, fontFamily: 'system-ui,sans-serif', fontWeight: '800', letterSpacing: '0.5px' }, 'VISA' )
 			);
 		}
-		if ( key === 'apple' ) {
+		if ( key === 'apple' || key.indexOf( 'apple_' ) === 0 ) {
 			return createElement(
 				'svg',
 				{ width: 28, height: 28, viewBox: '0 0 24 24', 'aria-hidden': 'true' },

@@ -10,7 +10,7 @@
 	'use strict';
 
 	/* ── Constants ──────────────────────────────────────────────────────── */
-	var BRAND_VALUE   = 'apple';
+	var APPLE_PREFIX  = 'apple';
 	var APPLE_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js';
 	var DATA          = window.hesabeApplePayData || {};
 
@@ -102,8 +102,14 @@
 		);
 	}
 
-	function getAppleRadio() {
-		return $( 'input[type="radio"][name="hesabe_brand"][value="' + BRAND_VALUE + '"]' );
+	function isAppleBrand( value ) {
+		return String( value || '' ).indexOf( APPLE_PREFIX ) === 0;
+	}
+
+	function getAppleRadios() {
+		return $( 'input[type="radio"][name="hesabe_brand"]' ).filter( function () {
+			return isAppleBrand( $( this ).val() );
+		} );
 	}
 
 	function syncBrandSelectionUI() {
@@ -374,8 +380,8 @@
 			var $gateway = $( '#payment_method_hesabe' );
 			if ( $gateway.length && ! $gateway.is( ':checked' ) ) { return true; }
 
-			var $apple = getAppleRadio();
-			if ( ! $apple.length || ! $apple.is( ':checked' ) ) { return true; }
+			var selected = $( 'input[name="hesabe_brand"]:checked' ).val();
+			if ( ! isAppleBrand( selected ) ) { return true; }
 
 			startApplePay();
 			return false; // Prevent WC from submitting the form via its own AJAX.
@@ -390,7 +396,7 @@
 		injectOverlay();
 		bindBrandCards();
 
-		var $apple = getAppleRadio();
+		var $apple = getAppleRadios();
 		if ( ! $apple.length ) {
 			// Apple Pay radio not on page (Hosted mode or brand disabled).
 			guardSubmit();
@@ -401,7 +407,9 @@
 		preloadAppleSDK();
 
 		if ( applePayKnownUnavailable() ) {
-			markUnavailable( $apple );
+			$apple.each( function () {
+				markUnavailable( $( this ) );
+			} );
 		}
 
 		guardSubmit();
@@ -409,9 +417,11 @@
 		// Re-check after WC refreshes the payment section.
 		$( document.body ).on( 'updated_checkout', function () {
 			bindBrandCards();
-			var $r = getAppleRadio();
+			var $r = getAppleRadios();
 			if ( $r.length && applePayKnownUnavailable() ) {
-				markUnavailable( $r );
+				$r.each( function () {
+					markUnavailable( $( this ) );
+				} );
 			}
 		} );
 	}

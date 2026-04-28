@@ -156,38 +156,68 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 				'default' => 'yes',
 				'class'   => 'hesabe-wc-direct-row',
 			),
-			'direct_apple'      => array(
+			'apple_pay_info'      => array(
 				'title'       => __( 'Direct: Apple Pay', 'hesabe-for-woocommerce' ),
-				'type'        => 'checkbox',
-				'label'       => __( 'Show Apple Pay option', 'hesabe-for-woocommerce' ),
+				'type'        => 'title',
 				'description' => sprintf(
 					/* translators: %s: link to Direct Apple Pay documentation */
 					__( 'Per Hesabe: enable Apple Pay on your merchant account, whitelist your domain, and place Apple’s domain verification file at %s. See the %s guide.', 'hesabe-for-woocommerce' ),
 					'<code>.well-known/apple-developer-merchantid-domain-association</code>',
 					'<a href="https://developer.hesabe.com/docs/guides/direct-apple-pay" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Direct Apple Pay', 'hesabe-for-woocommerce' ) . '</a>'
 				),
-				'default'     => 'yes',
 				'class'       => 'hesabe-wc-direct-row',
 			),
-			'apple_pay_type'    => array(
-				'title'       => __( 'Apple Pay type', 'hesabe-for-woocommerce' ),
-				'type'        => 'select',
+			'apple_pay_types_title' => array(
+				'title'       => __( 'Apple Pay types', 'hesabe-for-woocommerce' ),
+				'type'        => 'title',
 				'description' => sprintf(
 					/* translators: 1: link to same documentation page (paymentType list) */
-					__( 'Must match the type Hesabe enabled for your account. See the paymentType table in the %1$s. Contact support@hesabe.com to confirm.', 'hesabe-for-woocommerce' ),
+					__( 'Enable one or more types that are active on your Hesabe account. See the paymentType table in the %1$s. Contact support@hesabe.com to confirm.', 'hesabe-for-woocommerce' ),
 					'<a href="https://developer.hesabe.com/docs/guides/direct-apple-pay" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Direct Apple Pay documentation', 'hesabe-for-woocommerce' ) . '</a>'
 				),
-				'desc_tip'    => true,
-				'default'     => '9',
 				'class'       => 'hesabe-wc-direct-row',
-				'options'     => array(
-					'9'  => __( 'MPGS Apple Pay (9)', 'hesabe-for-woocommerce' ),
-					'10' => __( 'CYBS Apple Pay (10)', 'hesabe-for-woocommerce' ),
-					'11' => __( 'KNET Debit Apple Pay (11)', 'hesabe-for-woocommerce' ),
-					'12' => __( 'KNET Credit Apple Pay (12)', 'hesabe-for-woocommerce' ),
-					'13' => __( 'KNET Apple Pay International (13)', 'hesabe-for-woocommerce' ),
-					'14' => __( 'AMEX Apple Pay International (14)', 'hesabe-for-woocommerce' ),
-				),
+			),
+			'apple_pay_type_9' => array(
+				'title'   => __( 'MPGS Apple Pay (9)', 'hesabe-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Enable MPGS Apple Pay', 'hesabe-for-woocommerce' ),
+				'default' => 'yes',
+				'class'   => 'hesabe-wc-direct-row',
+			),
+			'apple_pay_type_10' => array(
+				'title'   => __( 'CYBS Apple Pay (10)', 'hesabe-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Enable CYBS Apple Pay', 'hesabe-for-woocommerce' ),
+				'default' => 'no',
+				'class'   => 'hesabe-wc-direct-row',
+			),
+			'apple_pay_type_11' => array(
+				'title'   => __( 'KNET Debit Apple Pay (11)', 'hesabe-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Enable KNET Debit Apple Pay', 'hesabe-for-woocommerce' ),
+				'default' => 'no',
+				'class'   => 'hesabe-wc-direct-row',
+			),
+			'apple_pay_type_12' => array(
+				'title'   => __( 'KNET Credit Apple Pay (12)', 'hesabe-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Enable KNET Credit Apple Pay', 'hesabe-for-woocommerce' ),
+				'default' => 'no',
+				'class'   => 'hesabe-wc-direct-row',
+			),
+			'apple_pay_type_13' => array(
+				'title'   => __( 'KNET Apple Pay International (13)', 'hesabe-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Enable KNET Apple Pay International', 'hesabe-for-woocommerce' ),
+				'default' => 'no',
+				'class'   => 'hesabe-wc-direct-row',
+			),
+			'apple_pay_type_14' => array(
+				'title'   => __( 'AMEX Apple Pay International (14)', 'hesabe-for-woocommerce' ),
+				'type'    => 'checkbox',
+				'label'   => __( 'Enable AMEX Apple Pay International', 'hesabe-for-woocommerce' ),
+				'default' => 'no',
+				'class'   => 'hesabe-wc-direct-row',
 			),
 			'currency_convert'        => array(
 				'title'   => __( 'Currency converter', 'hesabe-for-woocommerce' ),
@@ -340,6 +370,9 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 	 * @return string
 	 */
 	private function hesabe_direct_brand_icon_svg( $key ) {
+		if ( 0 === strpos( (string) $key, 'apple_' ) ) {
+			$key = 'apple';
+		}
 		switch ( $key ) {
 			case 'knet':
 				return '<svg class="hesabe-icon" width="40" height="24" viewBox="0 0 40 24" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><rect width="40" height="24" rx="3" fill="#0a6ebd"/><text x="20" y="16" text-anchor="middle" fill="#fff" font-size="8" font-family="system-ui,sans-serif" font-weight="700">KNET</text></svg>';
@@ -364,10 +397,76 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 		if ( 'yes' === $this->get_option( 'direct_visa', 'yes' ) ) {
 			$brands['visa'] = __( 'Visa / Mastercard', 'hesabe-for-woocommerce' );
 		}
-		if ( 'yes' === $this->get_option( 'direct_apple', 'yes' ) ) {
-			$brands['apple'] = __( 'Apple Pay', 'hesabe-for-woocommerce' );
+		$options = $this->get_apple_pay_type_options();
+		foreach ( $this->get_enabled_apple_pay_types() as $type ) {
+			$label = isset( $options[ $type ] ) ? $options[ $type ] : sprintf( __( 'Apple Pay (%s)', 'hesabe-for-woocommerce' ), $type );
+			$brands[ 'apple_' . $type ] = $label;
 		}
 		return $brands;
+	}
+
+	/**
+	 * Apple Pay paymentType labels.
+	 *
+	 * @return array<string, string>
+	 */
+	private function get_apple_pay_type_options() {
+		return array(
+			'9'  => __( 'MPGS Apple Pay', 'hesabe-for-woocommerce' ),
+			'10' => __( 'CYBS Apple Pay', 'hesabe-for-woocommerce' ),
+			'11' => __( 'KNET Debit Apple Pay', 'hesabe-for-woocommerce' ),
+			'12' => __( 'KNET Credit Apple Pay', 'hesabe-for-woocommerce' ),
+			'13' => __( 'KNET Apple Pay International', 'hesabe-for-woocommerce' ),
+			'14' => __( 'AMEX Apple Pay International', 'hesabe-for-woocommerce' ),
+		);
+	}
+
+	/**
+	 * Selected Apple Pay types from settings.
+	 * Supports new multiselect key and legacy single-select fallback.
+	 *
+	 * @return array<int, string>
+	 */
+	private function get_enabled_apple_pay_types() {
+		$allowed = array_keys( $this->get_apple_pay_type_options() );
+		$types   = array();
+
+		// New checkbox-based settings.
+		foreach ( $allowed as $type ) {
+			if ( 'yes' === $this->get_option( 'apple_pay_type_' . $type, 'no' ) ) {
+				$types[] = $type;
+			}
+		}
+
+		// Backward compatibility for multiselect setting.
+		$raw = $this->get_option( 'apple_pay_types', array() );
+
+		if ( is_string( $raw ) && '' !== $raw ) {
+			$raw = array_map( 'trim', explode( ',', $raw ) );
+		}
+
+		if ( is_array( $raw ) && ! empty( $raw ) ) {
+			foreach ( $raw as $value ) {
+				$type = preg_replace( '/[^0-9]/', '', (string) $value );
+				if ( in_array( $type, $allowed, true ) ) {
+					$types[] = $type;
+				}
+			}
+		}
+
+		if ( empty( $types ) ) {
+			$legacy = (string) $this->get_option( 'apple_pay_type', '9' );
+			if ( in_array( $legacy, $allowed, true ) ) {
+				$types[] = $legacy;
+			}
+		}
+
+		$types = array_values( array_unique( $types ) );
+		if ( empty( $types ) ) {
+			$types = array( '9' );
+		}
+
+		return $types;
 	}
 
 	// -------------------------------------------------------------------------
@@ -386,20 +485,41 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 
 		// Resolve payment type from mode + brand selection.
 		if ( Hesabe_WC_Config::is_direct_mode() ) {
-			// Apple Pay type is configurable in admin (9=MPGS, 10=CYBS, 11-14=KNET/AMEX variants).
-			$apple_type = $this->get_option( 'apple_pay_type', '9' );
-			$brand_map  = array(
-				'knet'  => '1',
-				'visa'  => '2',
-				'apple' => $apple_type,
-			);
+			$apple_types = $this->get_enabled_apple_pay_types();
+			$allowed_apple_types = array( '9', '10', '11', '12', '13', '14' );
+
 			// phpcs:ignore WordPress.Security.NonceVerification.Missing
 			$selected = isset( $_POST['hesabe_brand'] ) ? sanitize_key( $_POST['hesabe_brand'] ) : '';
-			if ( empty( $selected ) || ! isset( $brand_map[ $selected ] ) ) {
+			if ( 'apple' === $selected && ! empty( $apple_types ) ) {
+				$selected = 'apple_' . $apple_types[0];
+			}
+
+			if ( preg_match( '/^apple_([0-9]{1,2})$/', $selected, $m ) ) {
+				$candidate = (string) $m[1];
+				if ( in_array( $candidate, $allowed_apple_types, true ) ) {
+					$payment_type = $candidate;
+				}
+			}
+
+			if ( ! isset( $payment_type ) ) {
+				if ( 'knet' === $selected ) {
+					$payment_type = '1';
+				} elseif ( 'visa' === $selected ) {
+					$payment_type = '2';
+				}
+			}
+
+			if ( ! isset( $payment_type ) ) {
 				$brands   = $this->get_enabled_direct_brands();
 				$selected = ! empty( $brands ) ? array_key_first( $brands ) : 'knet';
+				if ( preg_match( '/^apple_([0-9]{1,2})$/', $selected, $m ) && in_array( (string) $m[1], $allowed_apple_types, true ) ) {
+					$payment_type = (string) $m[1];
+				} elseif ( 'visa' === $selected ) {
+					$payment_type = '2';
+				} else {
+					$payment_type = '1';
+				}
 			}
-			$payment_type = isset( $brand_map[ $selected ] ) ? $brand_map[ $selected ] : '1';
 		} else {
 			$payment_type = '0';
 		}
