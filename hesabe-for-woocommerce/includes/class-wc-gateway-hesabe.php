@@ -614,7 +614,7 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 				'order_id' => $order->get_id(),
 				'key'      => $order->get_order_key(),
 			),
-			home_url( '/wc-api/wc_hesabe_apple' )
+			WC()->api_request_url( 'wc_hesabe_apple' )
 		);
 
 		return array(

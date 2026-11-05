@@ -664,7 +664,9 @@ trait Hesabe_WC_Gateway_Shared {
 		$phone  = isset( $data['billing']['phone'] ) ? preg_replace( '/[^0-9]/', '', $data['billing']['phone'] ) : '';
 		$email  = isset( $data['billing']['email'] ) ? $data['billing']['email'] : '';
 		$amount = number_format( (float) $order->get_total(), 3, '.', '' );
-		$notify = home_url( '/wc-api/wc_hesabe' );
+		// WooCommerce's own URL for the endpoint: `/wc-api/wc_hesabe/` with pretty permalinks,
+		// `/?wc-api=wc_hesabe` with plain ones, where `/wc-api/` answers 404.
+		$notify = WC()->api_request_url( 'wc_hesabe' );
 
 		// Apple Pay types: 9=MPGS, 10=CYBS, 11=KNET Debit, 12=KNET Credit, 13=KNET Intl, 14=AMEX
 		// For these, variable5 must be the merchant domain (e.g. "example.com"), not email.
