@@ -48,6 +48,56 @@ class Hesabe_WC_Config {
 	}
 
 	/**
+	 * Apple Pay paymentType codes enabled in admin (9–14).
+	 * Only explicitly checked types are returned — nothing is auto-enabled.
+	 *
+	 * @param array<string, mixed>|null $settings Optional settings override.
+	 * @return array<int, string>
+	 */
+	public static function enabled_apple_pay_types( $settings = null ) {
+		$settings = is_array( $settings ) ? $settings : self::main_settings();
+		$allowed  = array( '9', '10', '11', '12', '13', '14' );
+		$types    = array();
+		$has_checkbox_settings = false;
+
+		foreach ( $allowed as $type ) {
+			$key = 'apple_pay_type_' . $type;
+			if ( array_key_exists( $key, $settings ) ) {
+				$has_checkbox_settings = true;
+			}
+			if ( isset( $settings[ $key ] ) && 'yes' === $settings[ $key ] ) {
+				$types[] = $type;
+			}
+		}
+
+		// Older installs: multiselect before per-type checkboxes existed.
+		if ( ! $has_checkbox_settings && isset( $settings['apple_pay_types'] ) ) {
+			$raw = $settings['apple_pay_types'];
+			if ( is_string( $raw ) && '' !== $raw ) {
+				$raw = array_map( 'trim', explode( ',', $raw ) );
+			}
+			if ( is_array( $raw ) ) {
+				foreach ( $raw as $value ) {
+					$type = preg_replace( '/[^0-9]/', '', (string) $value );
+					if ( in_array( $type, $allowed, true ) ) {
+						$types[] = $type;
+					}
+				}
+			}
+		}
+
+		// Older installs: single-select before per-type checkboxes existed.
+		if ( empty( $types ) && ! $has_checkbox_settings && isset( $settings['apple_pay_type'] ) ) {
+			$legacy = preg_replace( '/[^0-9]/', '', (string) $settings['apple_pay_type'] );
+			if ( in_array( $legacy, $allowed, true ) ) {
+				$types[] = $legacy;
+			}
+		}
+
+		return array_values( array_unique( $types ) );
+	}
+
+	/**
 	 * Credentials for the active environment.
 	 *
 	 * Sandbox: reads sandbox_* fields (pre-filled with Hesabe public sandbox keys).

@@ -251,17 +251,15 @@ body{
  font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
 }
 .wrap{text-align:center;padding:2rem;max-width:380px;width:100%}
-#hap-loading{font-size:.9rem;opacity:.75}
-#hap-unavailable,#hap-cancelled,#hap-error{display:none;font-size:.9rem}
-#hap-error{color:#ff6b6b}
-#hap-cancelled a,#hap-unavailable a{color:#fff;text-decoration:underline}
-.spinner{
- display:inline-block;width:22px;height:22px;margin-right:8px;
- border:2px solid rgba(255,255,255,.25);border-top-color:#fff;
- border-radius:50%;animation:spin .7s linear infinite;vertical-align:middle;
+#hap-loading{display:none}
+#hap-unavailable,#hap-cancelled,#hap-error{
+ display:none;
+ font-size:.95rem;
+ line-height:1.5;
+ opacity:.92;
+ margin-top:1rem;
 }
-@keyframes spin{to{transform:rotate(360deg)}}
-#applePayment{margin-top:1.5rem}
+#applePayment{margin-top:0}
 .applePaybtn{
  display:block;width:100%;height:52px;padding:0;
  background:#fff;color:transparent;border:none;border-radius:10px;
@@ -276,23 +274,9 @@ body{
 </head>
 <body>
 <div class="wrap">
-
- <svg style="opacity:.8;margin-bottom:1.5rem" width="44" height="44" viewBox="0 0 24 24" fill="white">
-  <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
- </svg>
-
- <div id="hap-loading"><span class="spinner"></span>Opening Apple Pay&hellip;</div>
-
- <div id="hap-unavailable">
-  Apple Pay is not available on this device.<br><br>
-  <a href="' . $checkout_url . '">Return to checkout</a> and choose another payment method.
- </div>
-
- <div id="hap-cancelled">
-  Apple Pay was cancelled.<br><br>
-  <a href="' . $checkout_url . '">Return to checkout</a>
- </div>
-
+ <div id="hap-loading"></div>
+ <div id="hap-unavailable">Apple Pay Not Enabled for selected method.</div>
+ <div id="hap-cancelled"></div>
  <div id="hap-error"></div>
 
  <!--
