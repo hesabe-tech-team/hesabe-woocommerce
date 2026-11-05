@@ -34,9 +34,6 @@ class Hesabe_WC_Return_Handler {
 		// Inline Apple Pay AJAX: merchant validation proxy.
 		add_action( 'wp_ajax_hesabe_apple_validate', array( __CLASS__, 'ajax_apple_validate' ) );
 		add_action( 'wp_ajax_nopriv_hesabe_apple_validate', array( __CLASS__, 'ajax_apple_validate' ) );
-		// Inline Apple Pay AJAX: cancel order on wallet cancel.
-		add_action( 'wp_ajax_hesabe_apple_cancel', array( __CLASS__, 'ajax_apple_cancel' ) );
-		add_action( 'wp_ajax_nopriv_hesabe_apple_cancel', array( __CLASS__, 'ajax_apple_cancel' ) );
 		self::$hook_added = true;
 	}
 
@@ -156,26 +153,6 @@ class Hesabe_WC_Return_Handler {
 	 */
 	public static function apple_pay_domain_for_payload() {
 		return self::apple_pay_domain();
-	}
-
-	/**
-	 * AJAX: Cancel the pending WC order when user dismisses the Apple Pay sheet.
-	 */
-	public static function ajax_apple_cancel() {
-		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
-		if ( ! wp_verify_nonce( $nonce, 'hesabe_apple_nonce' ) ) {
-			wp_send_json_error( 'Security check failed.' );
-		}
-
-		$order_id  = absint( isset( $_POST['order_id'] ) ? $_POST['order_id'] : 0 );
-		$order_key = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
-
-		$order = function_exists( 'wc_get_order' ) ? wc_get_order( $order_id ) : false;
-		if ( $order && hash_equals( (string) $order->get_order_key(), $order_key ) ) {
-			$order->update_status( 'cancelled', __( 'Apple Pay cancelled by customer.', 'hesabe-for-woocommerce' ) );
-		}
-
-		wp_send_json_success();
 	}
 
 	// -------------------------------------------------------------------------
