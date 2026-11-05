@@ -43,6 +43,9 @@ define( 'HESABE_WC_SANDBOX_IV_KEY', '5NVdrlPVNnjo2Jy9' );
 require_once HESABE_WC_PATH . 'includes/class-hesabe-crypt.php';
 require_once HESABE_WC_PATH . 'includes/class-hesabe-api.php';
 require_once HESABE_WC_PATH . 'includes/class-hesabe-config.php';
+require_once HESABE_WC_PATH . 'includes/class-hesabe-enquiry.php';
+require_once HESABE_WC_PATH . 'includes/class-hesabe-settlement.php';
+require_once HESABE_WC_PATH . 'includes/class-hesabe-webhook.php';
 
 add_action( 'before_woocommerce_init', 'hesabe_wc_declare_compatibility' );
 add_action( 'plugins_loaded', 'hesabe_wc_init', 20 );
@@ -74,6 +77,7 @@ function hesabe_wc_init() {
 	require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe.php';
 
 	add_filter( 'woocommerce_payment_gateways', 'hesabe_wc_add_gateway' );
+	Hesabe_WC_Settlement::register();
 }
 
 /**
