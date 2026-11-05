@@ -10,8 +10,8 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Applies what Hesabe reports about a payment to its order.
  *
- * Two things report a payment: the customer's return and Hesabe's webhook. The return comes
- * first: it decides an order still awaiting
+ * Three things report a payment: the customer's return, Hesabe's webhook and the "Check Hesabe
+ * payment status" order action. The return comes first: it decides an order still awaiting
  * payment from what it carried, as the plugin always has. The webhook is the backup for a
  * customer who never comes back, whose order WooCommerce would otherwise cancel when its
  * "Hold stock" time runs out. The two often land within a second of each other, and Hesabe
@@ -57,6 +57,9 @@ class Hesabe_WC_Settlement {
 	/** Order meta holding the tokens of the order's checkouts. */
 	const TOKENS_META = '_hesabe_checkout_tokens';
 
+	/** The order action's key. */
+	const ORDER_ACTION = 'hesabe_check_payment_status';
+
 	/** How long a request waits for another one to finish with the order, in seconds. */
 	const LOCK_SECONDS = 15;
 
@@ -64,10 +67,12 @@ class Hesabe_WC_Settlement {
 	const CLOCK_SKEW_SECONDS = 600;
 
 	/**
-	 * Registers the webhook endpoint.
+	 * Registers the webhook endpoint and the order action.
 	 */
 	public static function register() {
 		add_action( 'woocommerce_api_wc_hesabe_webhook', array( 'Hesabe_WC_Webhook', 'handle' ) );
+		add_filter( 'woocommerce_order_actions', array( __CLASS__, 'add_order_action' ), 10, 2 );
+		add_action( 'woocommerce_order_action_' . self::ORDER_ACTION, array( __CLASS__, 'check_payment_status' ) );
 	}
 
 	/**
@@ -168,6 +173,46 @@ class Hesabe_WC_Settlement {
 				return self::apply( $order, $webhook, $source, true );
 			}
 		);
+	}
+
+	/**
+	 * Adds "Check Hesabe payment status" to the order actions of a Hesabe order.
+	 *
+	 * @param array<string, string> $actions Order actions.
+	 * @param WC_Order|null         $order   Order; older WooCommerce versions do not pass it.
+	 * @return array<string, string>
+	 */
+	public static function add_order_action( $actions, $order = null ) {
+		global $theorder;
+		$order = $order instanceof WC_Order ? $order : $theorder;
+		if ( $order instanceof WC_Order && self::is_hesabe_order( $order ) ) {
+			$actions[ self::ORDER_ACTION ] = __( 'Check Hesabe payment status', 'hesabe-for-woocommerce' );
+		}
+		return $actions;
+	}
+
+	/**
+	 * The order action: asks Hesabe's Transaction Enquiry about the order and applies the
+	 * latest status. Every outcome leaves an order note.
+	 *
+	 * @param WC_Order $order Order.
+	 */
+	public static function check_payment_status( $order ) {
+		if ( ! $order instanceof WC_Order || ! self::is_hesabe_order( $order ) ) {
+			return;
+		}
+		$outcome = self::enquire( $order->get_id(), __( 'payment status check', 'hesabe-for-woocommerce' ), true );
+
+		$notes = array(
+			self::WAITING => __( 'Hesabe payment status check: Hesabe has no completed payment for this order yet. Nothing was changed.', 'hesabe-for-woocommerce' ),
+			self::BUSY    => __( 'Hesabe payment status check: another request was updating the order. Nothing was changed. Try again in a minute.', 'hesabe-for-woocommerce' ),
+		);
+		if ( isset( $notes[ $outcome ] ) ) {
+			$fresh = self::fresh_order( $order->get_id() );
+			if ( $fresh instanceof WC_Order ) {
+				$fresh->add_order_note( $notes[ $outcome ] );
+			}
+		}
 	}
 
 	/**
