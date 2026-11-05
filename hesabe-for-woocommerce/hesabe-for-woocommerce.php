@@ -7,8 +7,11 @@
  * Author: Hesabe
  * Text Domain: hesabe-for-woocommerce
  * Requires at least: 5.8
+ * Tested up to: 7.1
  * Requires PHP: 7.4
+ * Requires Plugins: woocommerce
  * WC requires at least: 6.0
+ * WC tested up to: 11.2
  * License: GPL-3.0-or-later
  *
  * @package Hesabe_WC
@@ -46,11 +49,15 @@ add_action( 'plugins_loaded', 'hesabe_wc_init', 20 );
 add_action( 'woocommerce_blocks_loaded', 'hesabe_wc_register_blocks_integration' );
 
 /**
- * Declare compatibility with custom order tables (HPOS).
+ * Declare compatibility with custom order tables (HPOS) and the Cart and Checkout blocks.
+ *
+ * Without the blocks declaration, WooCommerce lists the plugin as neither compatible nor
+ * incompatible with the blocks, although the plugin registers a Checkout block payment method.
  */
 function hesabe_wc_declare_compatibility() {
 	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', HESABE_WC_FILE, true );
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', HESABE_WC_FILE, true );
 	}
 }
 
