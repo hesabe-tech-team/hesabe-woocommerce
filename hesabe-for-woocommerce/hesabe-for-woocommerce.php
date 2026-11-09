@@ -3,7 +3,7 @@
  * Plugin Name: Hesabe for WooCommerce
  * Plugin URI: https://hesabe.com/
  * Description: Hesabe payment gateway for WooCommerce — hosted Hesabe checkout or direct payment method selection (KNET, Visa/Mastercard, Apple Pay).
- * Version: 1.1.0
+ * Version: 11.2
  * Author: Hesabe
  * Text Domain: hesabe-for-woocommerce
  * Requires at least: 5.8
@@ -19,7 +19,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'HESABE_WC_VERSION', '1.1.0' );
+define( 'HESABE_WC_VERSION', '11.2' );
 define( 'HESABE_WC_FILE', __FILE__ );
 define( 'HESABE_WC_PATH', plugin_dir_path( __FILE__ ) );
 define( 'HESABE_WC_URL', plugin_dir_url( __FILE__ ) );

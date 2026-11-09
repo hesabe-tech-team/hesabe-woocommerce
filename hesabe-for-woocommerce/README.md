@@ -7,7 +7,7 @@ Hesabe payment gateway integration for WooCommerce with two checkout styles:
 
 ## Plugin Version
 
-- Current plugin version: `1.1.0`
+- Current plugin version: `11.2`
 
 ## Compatibility / Supported Versions
 
