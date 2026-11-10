@@ -53,7 +53,15 @@ class Hesabe_WC_API {
 		$body = wp_remote_retrieve_body( $response );
 
 		if ( $code < 200 || $code >= 300 ) {
-			return new \WP_Error( 'hesabe_http', sprintf( /* translators: %d HTTP status */ __( 'Checkout request failed (HTTP %d).', 'hesabe-for-woocommerce' ), $code ), array( 'status' => $code, 'body' => $body ) );
+			$reason = self::refusal_reason( $body, $secret_key, $iv_key );
+			if ( '' === $reason ) {
+				/* translators: %d HTTP status */
+				$message = sprintf( __( 'Checkout request failed (HTTP %d).', 'hesabe-for-woocommerce' ), $code );
+			} else {
+				/* translators: 1: HTTP status, 2: Hesabe's reason, such as "The email must be a valid email address." */
+				$message = sprintf( __( 'Hesabe could not start the payment (HTTP %1$d): %2$s', 'hesabe-for-woocommerce' ), $code, $reason );
+			}
+			return new \WP_Error( 'hesabe_http', $message, array( 'status' => $code, 'body' => $body ) );
 		}
 
 		$body = trim( $body );
@@ -68,5 +76,29 @@ class Hesabe_WC_API {
 		}
 
 		return $data;
+	}
+
+	/**
+	 * Hesabe's reason for refusing a checkout, or '' when the answer has none.
+	 *
+	 * A refusal comes encrypted like any answer, for example HTTP 422 with
+	 * `{"status":false,"code":506,"message":"The email must be a valid email address.",...}`
+	 * for a customer email at example.com (sandbox, November 2026).
+	 *
+	 * @param string $body       Answer body.
+	 * @param string $secret_key Secret key.
+	 * @param string $iv_key     IV key.
+	 * @return string
+	 */
+	private static function refusal_reason( $body, $secret_key, $iv_key ) {
+		$body = trim( (string) $body );
+		if ( '' !== $body && ctype_xdigit( $body ) ) {
+			$body = (string) Hesabe_WC_Crypt::decrypt( $body, $secret_key, $iv_key );
+		}
+		$answer = json_decode( $body, true );
+		if ( ! is_array( $answer ) || ! isset( $answer['message'] ) || ! is_string( $answer['message'] ) ) {
+			return '';
+		}
+		return substr( sanitize_text_field( $answer['message'] ), 0, 200 );
 	}
 }

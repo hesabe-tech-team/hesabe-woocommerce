@@ -603,6 +603,9 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 			return array( 'result' => 'failure' );
 		}
 
+		// The checkout's token names this payment in Hesabe's webhook and Transaction Enquiry.
+		Hesabe_WC_Settlement::remember_checkout( $order, isset( $result->token ) ? (string) $result->token : '' );
+
 		$token = (string) $result->response->data;
 		$order->update_meta_data( '_hesabe_apple_token', $token );
 		$order->update_meta_data( '_hesabe_base_url', $c['base_url'] );
@@ -614,7 +617,7 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 				'order_id' => $order->get_id(),
 				'key'      => $order->get_order_key(),
 			),
-			home_url( '/wc-api/wc_hesabe_apple' )
+			WC()->api_request_url( 'wc_hesabe_apple' )
 		);
 
 		return array(

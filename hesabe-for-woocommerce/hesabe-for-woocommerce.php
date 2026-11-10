@@ -3,12 +3,15 @@
  * Plugin Name: Hesabe for WooCommerce
  * Plugin URI: https://hesabe.com/
  * Description: Hesabe payment gateway for WooCommerce — hosted Hesabe checkout or direct payment method selection (KNET, Visa/Mastercard, Apple Pay).
- * Version: 1.0.13
+ * Version: 11.2
  * Author: Hesabe
  * Text Domain: hesabe-for-woocommerce
  * Requires at least: 5.8
+ * Tested up to: 7.1
  * Requires PHP: 7.4
+ * Requires Plugins: woocommerce
  * WC requires at least: 6.0
+ * WC tested up to: 11.2
  * License: GPL-3.0-or-later
  *
  * @package Hesabe_WC
@@ -16,7 +19,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'HESABE_WC_VERSION', '1.0.13' );
+define( 'HESABE_WC_VERSION', '11.2' );
 define( 'HESABE_WC_FILE', __FILE__ );
 define( 'HESABE_WC_PATH', plugin_dir_path( __FILE__ ) );
 define( 'HESABE_WC_URL', plugin_dir_url( __FILE__ ) );
@@ -40,17 +43,24 @@ define( 'HESABE_WC_SANDBOX_IV_KEY', '5NVdrlPVNnjo2Jy9' );
 require_once HESABE_WC_PATH . 'includes/class-hesabe-crypt.php';
 require_once HESABE_WC_PATH . 'includes/class-hesabe-api.php';
 require_once HESABE_WC_PATH . 'includes/class-hesabe-config.php';
+require_once HESABE_WC_PATH . 'includes/class-hesabe-enquiry.php';
+require_once HESABE_WC_PATH . 'includes/class-hesabe-settlement.php';
+require_once HESABE_WC_PATH . 'includes/class-hesabe-webhook.php';
 
 add_action( 'before_woocommerce_init', 'hesabe_wc_declare_compatibility' );
 add_action( 'plugins_loaded', 'hesabe_wc_init', 20 );
 add_action( 'woocommerce_blocks_loaded', 'hesabe_wc_register_blocks_integration' );
 
 /**
- * Declare compatibility with custom order tables (HPOS).
+ * Declare compatibility with custom order tables (HPOS) and the Cart and Checkout blocks.
+ *
+ * Without the blocks declaration, WooCommerce lists the plugin as neither compatible nor
+ * incompatible with the blocks, although the plugin registers a Checkout block payment method.
  */
 function hesabe_wc_declare_compatibility() {
 	if ( class_exists( '\Automattic\WooCommerce\Utilities\FeaturesUtil' ) ) {
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', HESABE_WC_FILE, true );
+		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', HESABE_WC_FILE, true );
 	}
 }
 
@@ -67,6 +77,7 @@ function hesabe_wc_init() {
 	require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe.php';
 
 	add_filter( 'woocommerce_payment_gateways', 'hesabe_wc_add_gateway' );
+	Hesabe_WC_Settlement::register();
 }
 
 /**

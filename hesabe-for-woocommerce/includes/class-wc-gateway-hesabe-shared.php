@@ -34,9 +34,6 @@ class Hesabe_WC_Return_Handler {
 		// Inline Apple Pay AJAX: merchant validation proxy.
 		add_action( 'wp_ajax_hesabe_apple_validate', array( __CLASS__, 'ajax_apple_validate' ) );
 		add_action( 'wp_ajax_nopriv_hesabe_apple_validate', array( __CLASS__, 'ajax_apple_validate' ) );
-		// Inline Apple Pay AJAX: cancel order on wallet cancel.
-		add_action( 'wp_ajax_hesabe_apple_cancel', array( __CLASS__, 'ajax_apple_cancel' ) );
-		add_action( 'wp_ajax_nopriv_hesabe_apple_cancel', array( __CLASS__, 'ajax_apple_cancel' ) );
 		self::$hook_added = true;
 	}
 
@@ -156,26 +153,6 @@ class Hesabe_WC_Return_Handler {
 	 */
 	public static function apple_pay_domain_for_payload() {
 		return self::apple_pay_domain();
-	}
-
-	/**
-	 * AJAX: Cancel the pending WC order when user dismisses the Apple Pay sheet.
-	 */
-	public static function ajax_apple_cancel() {
-		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
-		if ( ! wp_verify_nonce( $nonce, 'hesabe_apple_nonce' ) ) {
-			wp_send_json_error( 'Security check failed.' );
-		}
-
-		$order_id  = absint( isset( $_POST['order_id'] ) ? $_POST['order_id'] : 0 );
-		$order_key = isset( $_POST['order_key'] ) ? sanitize_text_field( wp_unslash( $_POST['order_key'] ) ) : '';
-
-		$order = function_exists( 'wc_get_order' ) ? wc_get_order( $order_id ) : false;
-		if ( $order && hash_equals( (string) $order->get_order_key(), $order_key ) ) {
-			$order->update_status( 'cancelled', __( 'Apple Pay cancelled by customer.', 'hesabe-for-woocommerce' ) );
-		}
-
-		wp_send_json_success();
 	}
 
 	// -------------------------------------------------------------------------
@@ -500,24 +477,20 @@ body{
 		$ok = ! empty( $json->status )
 			&& in_array( $order_status, array( 'CAPTURED', 'ACCEPT', 'AUTHORIZED', 'PARTIALLY_CAPTURED', 'SUCCESS' ), true );
 
-		if ( $ok ) {
+		// The return decides an order still awaiting payment. An order the webhook settled
+		// first is checked again with the Transaction Enquiry, and a failed return never
+		// changes a paid order, so the customer's page follows Hesabe's latest status.
+		$paid = Hesabe_WC_Settlement::from_return( $order_id, $ok, $info );
+
+		if ( $paid ) {
 			$msg_class = 'success';
 			$message   = __( 'Thank you. Your payment was successful.', 'hesabe-for-woocommerce' );
-			if ( ! $order->is_paid() ) {
-				$order->payment_complete();
-				if ( isset( $info->paymentId ) ) {
-					$order->update_meta_data( '_hesabe_payment_id', sanitize_text_field( (string) $info->paymentId ) );
-				}
-				$order->save();
+		}
+		if ( $paid && $ok && function_exists( 'WC' ) ) {
+			$wc = WC();
+			if ( $wc && $wc->cart ) {
+				$wc->cart->empty_cart();
 			}
-			if ( function_exists( 'WC' ) ) {
-				$wc = WC();
-				if ( $wc && $wc->cart ) {
-					$wc->cart->empty_cart();
-				}
-			}
-		} else {
-			$order->update_status( 'failed', __( 'Hesabe payment failed or declined.', 'hesabe-for-woocommerce' ) );
 		}
 
 		wc_add_notice( $message, $msg_class );
@@ -637,6 +610,9 @@ trait Hesabe_WC_Gateway_Shared {
 			return;
 		}
 
+		// The checkout's token names this payment in Hesabe's webhook and Transaction Enquiry.
+		Hesabe_WC_Settlement::remember_checkout( $order, isset( $result->token ) ? (string) $result->token : '' );
+
 		$token = (string) $result->response->data;
 		wp_redirect( $c['base_url'] . '/payment?data=' . rawurlencode( $token ) );
 		exit;
@@ -664,7 +640,9 @@ trait Hesabe_WC_Gateway_Shared {
 		$phone  = isset( $data['billing']['phone'] ) ? preg_replace( '/[^0-9]/', '', $data['billing']['phone'] ) : '';
 		$email  = isset( $data['billing']['email'] ) ? $data['billing']['email'] : '';
 		$amount = number_format( (float) $order->get_total(), 3, '.', '' );
-		$notify = home_url( '/wc-api/wc_hesabe' );
+		// WooCommerce's own URL for the endpoint: `/wc-api/wc_hesabe/` with pretty permalinks,
+		// `/?wc-api=wc_hesabe` with plain ones, where `/wc-api/` answers 404.
+		$notify = WC()->api_request_url( 'wc_hesabe' );
 
 		// Apple Pay types: 9=MPGS, 10=CYBS, 11=KNET Debit, 12=KNET Credit, 13=KNET Intl, 14=AMEX
 		// For these, variable5 must be the merchant domain (e.g. "example.com"), not email.
@@ -678,7 +656,9 @@ trait Hesabe_WC_Gateway_Shared {
 			'responseUrl'          => $notify,
 			'failureUrl'           => $notify,
 			'paymentType'          => (int) $payment_type,
-			'version'              => '2.0',
+			// 3.0 makes Hesabe sign its webhook (`x-signature`); a 2.0 webhook is unsigned.
+			'version'              => '3.0',
+			'webhookUrl'           => WC()->api_request_url( 'wc_hesabe_webhook' ),
 			'orderReferenceNumber' => $order->get_id(),
 			'variable1'            => (string) $order->get_id(),
 			'variable2'            => isset( $data['version'] ) ? (string) $data['version'] : '',
@@ -705,8 +685,7 @@ trait Hesabe_WC_Gateway_Shared {
 		/**
 		 * Filter the Hesabe checkout POST body before encryption.
 		 *
-		 * Use this to add optional fields from the Direct Apple Pay / Checkout docs,
-		 * e.g. `webhookUrl` for server-to-server notifications.
+		 * Use this to add optional fields from the Direct Apple Pay / Checkout docs.
 		 *
 		 * @param array<string, mixed> $post_values  Request fields.
 		 * @param WC_Order             $order         Order.
