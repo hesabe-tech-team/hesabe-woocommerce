@@ -3,23 +3,23 @@
  * Plugin Name: Hesabe for WooCommerce
  * Plugin URI: https://hesabe.com/
  * Description: Hesabe payment gateway for WooCommerce — hosted Hesabe checkout or direct payment method selection (KNET, Visa/Mastercard, Apple Pay).
- * Version: 11.2
+ * Version: 11.2.1
  * Author: Hesabe
  * Text Domain: hesabe-for-woocommerce
  * Requires at least: 5.8
- * Tested up to: 7.1
  * Requires PHP: 7.4
  * Requires Plugins: woocommerce
  * WC requires at least: 6.0
- * WC tested up to: 11.2
- * License: GPL-3.0-or-later
+ * WC tested up to: 11.3
+ * License: GPLv2 or later
+ * License URI: https://www.gnu.org/licenses/gpl-2.0.html
  *
  * @package Hesabe_WC
  */
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'HESABE_WC_VERSION', '11.2' );
+define( 'HESABE_WC_VERSION', '11.2.1' );
 define( 'HESABE_WC_FILE', __FILE__ );
 define( 'HESABE_WC_PATH', plugin_dir_path( __FILE__ ) );
 define( 'HESABE_WC_URL', plugin_dir_url( __FILE__ ) );
@@ -73,8 +73,8 @@ function hesabe_wc_init() {
 	}
 
 	// Load only after WooCommerce defines WC_Payment_Gateway (avoid fatal if we load before WooCommerce).
-	require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe-shared.php';
-	require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe.php';
+	require_once HESABE_WC_PATH . 'includes/class-hesabe-wc-gateway-shared.php';
+	require_once HESABE_WC_PATH . 'includes/class-hesabe-wc-gateway.php';
 
 	add_filter( 'woocommerce_payment_gateways', 'hesabe_wc_add_gateway' );
 	Hesabe_WC_Settlement::register();
@@ -85,7 +85,7 @@ function hesabe_wc_init() {
  * @return array<string, string>
  */
 function hesabe_wc_add_gateway( $methods ) {
-	$methods[] = 'WC_Gateway_Hesabe';
+	$methods[] = 'Hesabe_WC_Gateway';
 	return $methods;
 }
 
@@ -101,9 +101,9 @@ function hesabe_wc_register_blocks_integration() {
 		return;
 	}
 
-	if ( class_exists( 'WC_Payment_Gateway' ) && ! class_exists( 'WC_Gateway_Hesabe', false ) ) {
-		require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe-shared.php';
-		require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe.php';
+	if ( class_exists( 'WC_Payment_Gateway' ) && ! class_exists( 'Hesabe_WC_Gateway', false ) ) {
+		require_once HESABE_WC_PATH . 'includes/class-hesabe-wc-gateway-shared.php';
+		require_once HESABE_WC_PATH . 'includes/class-hesabe-wc-gateway.php';
 	}
 
 	require_once HESABE_WC_PATH . 'includes/class-hesabe-blocks-support.php';

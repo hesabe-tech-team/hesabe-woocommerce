@@ -94,6 +94,7 @@ class Hesabe_WC_Blocks_Hesabe extends AbstractPaymentMethodType {
 			}
 			$options = $this->apple_pay_type_options();
 			foreach ( Hesabe_WC_Config::enabled_apple_pay_types( $s ) as $type ) {
+				/* translators: %s: Hesabe's Apple Pay payment type code, 9 to 14 */
 				$label = isset( $options[ $type ] ) ? $options[ $type ] : sprintf( __( 'Apple Pay (%s)', 'hesabe-for-woocommerce' ), $type );
 				$brands[ 'apple_' . $type ] = $label;
 			}
