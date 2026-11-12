@@ -299,7 +299,9 @@ class Hesabe_WC_Settlement {
 			}
 			$amount = self::amount( isset( $record['amount'] ) ? $record['amount'] : null );
 			$total  = self::amount( $order->get_total() );
-			/** This filter is documented in WooCommerce's WC_Order::payment_complete(). */
+			// WooCommerce's own filter, applied as WC_Order::payment_complete() applies it, so the
+			// plugin and WooCommerce agree on which orders a payment may complete.
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound
 			$payable = apply_filters( 'woocommerce_valid_order_statuses_for_payment_complete', array( 'on-hold', 'pending', 'failed', 'cancelled' ), $order );
 			if ( ! $order->has_status( $payable ) ) {
 				/* translators: 1: what reported it, 2: amount, 3: Hesabe's payment token, 4: order status */
@@ -424,6 +426,9 @@ class Hesabe_WC_Settlement {
 	private static function locked( $order_id, $work ) {
 		global $wpdb;
 		$name = 'hesabe_' . substr( md5( DB_NAME . $wpdb->prefix ), 0, 12 ) . '_' . absint( $order_id );
+		// GET_LOCK and RELEASE_LOCK are a named lock on the database server. They read and write
+		// no table, so WordPress has no API for them and there is nothing to cache.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		if ( '1' !== (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, %d)', $name, self::LOCK_SECONDS ) ) ) {
 			return self::BUSY;
 		}
@@ -434,6 +439,7 @@ class Hesabe_WC_Settlement {
 			}
 			return $work( $order );
 		} finally {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->query( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $name ) );
 		}
 	}

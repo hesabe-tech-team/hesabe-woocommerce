@@ -412,21 +412,22 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 	 * @return string
 	 */
 	private function get_selected_hesabe_brand() {
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		// WooCommerce calls process_payment() after it has verified the checkout request: the
+		// checkout form's nonce on the classic checkout, the Store API's on the Checkout block.
+		// phpcs:disable WordPress.Security.NonceVerification.Missing
 		if ( isset( $_POST['hesabe_brand'] ) ) {
 			return sanitize_key( wp_unslash( $_POST['hesabe_brand'] ) );
 		}
 
 		// WooCommerce Blocks checkout sends custom fields in payment_data.
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		if ( isset( $_POST['payment_data'] ) && is_array( $_POST['payment_data'] ) ) {
-			// phpcs:ignore WordPress.Security.NonceVerification.Missing
-			foreach ( wp_unslash( $_POST['payment_data'] ) as $item ) {
+			foreach ( map_deep( wp_unslash( $_POST['payment_data'] ), 'sanitize_text_field' ) as $item ) {
 				if ( is_array( $item ) && isset( $item['key'], $item['value'] ) && 'hesabe_brand' === $item['key'] ) {
 					return sanitize_key( (string) $item['value'] );
 				}
 			}
 		}
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		return '';
 	}

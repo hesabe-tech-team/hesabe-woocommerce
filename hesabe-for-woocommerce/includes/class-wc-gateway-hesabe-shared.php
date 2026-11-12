@@ -342,6 +342,9 @@ class Hesabe_WC_Return_Handler {
 		$msg_class = 'error';
 		$message   = __( 'This transaction could not be completed. Please try again.', 'hesabe-for-woocommerce' );
 
+		// Hesabe sends the customer back with `data`, encrypted with the merchant's keys. It
+		// cannot carry a WordPress nonce: decrypting it with those keys is what admits it.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$response_data = isset( $_REQUEST['data'] ) ? sanitize_text_field( wp_unslash( $_REQUEST['data'] ) ) : '';
 		if ( '' === $response_data ) {
 			wc_add_notice( $message, $msg_class );
@@ -523,6 +526,9 @@ trait Hesabe_WC_Gateway_Shared {
 		Hesabe_WC_Settlement::remember_checkout( $order, isset( $result->token ) ? (string) $result->token : '' );
 
 		$token = (string) $result->response->data;
+		// Hesabe's payment page is on Hesabe's host, which wp_safe_redirect() would refuse. The
+		// host is the plugin's own constant for the environment, never request input.
+		// phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect
 		wp_redirect( $c['base_url'] . '/payment?data=' . rawurlencode( $token ) );
 		exit;
 	}
