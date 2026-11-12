@@ -606,6 +606,7 @@ trait Hesabe_WC_Gateway_Shared {
 					wp_json_encode( $result )
 				)
 			);
+			/* translators: 1: Hesabe's error code, 2: Hesabe's error message */
 			echo '<p>' . esc_html( sprintf( __( 'Payment could not start (Code %1$s — %2$s). Please go back and try again.', 'hesabe-for-woocommerce' ), $code, $message ) ) . '</p>';
 			return;
 		}

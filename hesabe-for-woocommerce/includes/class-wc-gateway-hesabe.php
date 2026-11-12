@@ -160,8 +160,8 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 				'title'       => __( 'Direct: Apple Pay', 'hesabe-for-woocommerce' ),
 				'type'        => 'title',
 				'description' => sprintf(
-					/* translators: %s: link to Direct Apple Pay documentation */
-					__( 'Per Hesabe: enable Apple Pay on your merchant account, whitelist your domain, and place Apple’s domain verification file at %s. See the %s guide.', 'hesabe-for-woocommerce' ),
+					/* translators: 1: path of Apple's domain verification file, 2: link to the Direct Apple Pay documentation */
+					__( 'Per Hesabe: enable Apple Pay on your merchant account, whitelist your domain, and place Apple’s domain verification file at %1$s. See the %2$s guide.', 'hesabe-for-woocommerce' ),
 					'<code>.well-known/apple-developer-merchantid-domain-association</code>',
 					'<a href="https://developer.hesabe.com/docs/guides/direct-apple-pay" target="_blank" rel="noopener noreferrer">' . esc_html__( 'Direct Apple Pay', 'hesabe-for-woocommerce' ) . '</a>'
 				),
@@ -399,6 +399,7 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 		}
 		$options = $this->get_apple_pay_type_options();
 		foreach ( Hesabe_WC_Config::enabled_apple_pay_types() as $type ) {
+			/* translators: %s: Hesabe's Apple Pay payment type code, 9 to 14 */
 			$label = isset( $options[ $type ] ) ? $options[ $type ] : sprintf( __( 'Apple Pay (%s)', 'hesabe-for-woocommerce' ), $type );
 			$brands[ 'apple_' . $type ] = $label;
 		}
@@ -596,6 +597,7 @@ class WC_Gateway_Hesabe extends WC_Payment_Gateway {
 			if ( false !== stripos( $msg, 'Invalid Payment Method' ) || false !== stripos( $msg, 'invalid payment' ) ) {
 				$user_msg = __( 'Apple Pay is not enabled on this store yet. Please choose KNET or Visa/Mastercard, or contact the store administrator.', 'hesabe-for-woocommerce' );
 			} else {
+				/* translators: %s: Hesabe's error message */
 				$user_msg = sprintf( __( 'Apple Pay could not start: %s', 'hesabe-for-woocommerce' ), $msg );
 			}
 
