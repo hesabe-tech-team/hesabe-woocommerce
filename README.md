@@ -5,6 +5,10 @@ Hesabe payment gateway integration for WooCommerce with two checkout styles:
 - Hosted mode: customer is redirected to Hesabe payment page.
 - Direct mode: customer selects brand at checkout (KNET, Visa/Mastercard, Apple Pay).
 
+The plugin is the `hesabe-for-woocommerce/` folder, exactly as it ships. Its `readme.txt` is
+the readme the WordPress.org Plugin Directory shows, and names the external services the
+plugin calls.
+
 ## Plugin Version
 
 - Current plugin version: `11.2`
@@ -44,6 +48,7 @@ Hosted and Direct mode, on the Checkout block and the classic checkout:
 
 1. Copy folder `hesabe-for-woocommerce` to:
    - `wp-content/plugins/`
+   - or upload the ZIP (see "Packaging") under `Plugins` -> `Add New Plugin` -> `Upload Plugin`
 2. Activate plugin from WordPress admin:
    - `Plugins` -> `Installed Plugins` -> `Hesabe for WooCommerce` -> `Activate`
 3. Ensure WooCommerce is installed and active.
@@ -143,6 +148,32 @@ If you see domain-related errors (`not registered for domain`), confirm the exac
   - Check that `wc-api/wc_hesabe_webhook` is reachable from the internet
 - Apple Pay button shown but payment fails:
   - Validate domain registration and Apple Pay merchant setup
+
+## Packaging
+
+The ZIP for WordPress.org, or for `Upload Plugin`, is the plugin folder and nothing else:
+
+```bash
+git archive --format=zip --output=hesabe-for-woocommerce.zip HEAD hesabe-for-woocommerce
+```
+
+Before a release, run [Plugin Check](https://wordpress.org/plugins/plugin-check/) on the
+installed plugin, from the WordPress root. The first command runs every check, the runtime
+ones included. The second is the one the Plugin Directory runs on an uploaded ZIP (November
+2026); a finding of type `ERROR` blocks the upload.
+
+```bash
+wp plugin check hesabe-for-woocommerce --require=./wp-content/plugins/plugin-check/cli.php
+wp plugin check hesabe-for-woocommerce --categories=plugin_repo --exclude-checks=prefixing \
+  --error-severity=7 --warning-severity=6 --include-low-severity-errors
+```
+
+In `readme.txt`, `Stable tag` must equal `Version` in `hesabe-for-woocommerce.php`, and
+`Tested up to` is the newest WordPress version the release was tested with.
+
+## License
+
+GPLv2 or later. The text is in `hesabe-for-woocommerce/license.txt`.
 
 ## Support
 
