@@ -15,6 +15,18 @@ defined( 'ABSPATH' ) || exit;
  */
 class Hesabe_WC_Return_Handler {
 
+	/** Apple's Apple Pay SDK, as Apple serves it. */
+	const APPLE_SDK_URL = 'https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js';
+
+	/** Handle of the Apple Pay page's stylesheet. */
+	const APPLE_PAGE_STYLE = 'hesabe-wc-apple-pay-page';
+
+	/** Handles of the Apple Pay page's scripts, in the order they run. */
+	const APPLE_SDK_SCRIPT     = 'hesabe-wc-apple-pay-sdk';
+	const APPLE_SESSION_SCRIPT = 'hesabe-wc-apple-pay-session';
+	const APPLE_INIT_SCRIPT    = 'hesabe-wc-apple-pay-init';
+	const APPLE_WALLET_SCRIPT  = 'hesabe-wc-apple-pay-wallet';
+
 	/**
 	 * @var bool
 	 */
@@ -179,8 +191,12 @@ class Hesabe_WC_Return_Handler {
 	 *   - button.applePaybtn inside #applePayment  (click handler attached by script)
 	 */
 	public static function handle_apple_page() {
+		// process_payment() redirects the customer to this page with the order's ID and key.
+		// There is no form to carry a nonce: the order key authorises the request.
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended
 		$order_id  = isset( $_GET['order_id'] ) ? absint( $_GET['order_id'] ) : 0;
 		$order_key = isset( $_GET['key'] ) ? sanitize_text_field( wp_unslash( $_GET['key'] ) ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 
 		if ( ! $order_id ) {
 			wp_safe_redirect( home_url( '/' ) );
@@ -202,213 +218,105 @@ class Hesabe_WC_Return_Handler {
 		}
 
 		// Hesabe's /applepay?data={token} endpoint returns Blade-rendered JS.
-		// It must be loaded as <script src> (not fetch+inject) so the same-origin
+		// It must be loaded as a script of its own (not fetch+inject) so the same-origin
 		// variable rendering works correctly. The script expects:
 		//   document.querySelector(".applePaybtn")  → attach click + ApplePaySession
 		//   document.getElementById("applePayment") → shown when canMakePaymentsWithActiveCard() = true
-		$applepay_script_url = esc_url_raw( rtrim( $base_url, '/' ) . '/applepay?data=' . rawurlencode( (string) $token ) );
-		$site_name           = esc_html( get_bloginfo( 'name' ) );
-		$checkout_url        = esc_js( function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : home_url( '/' ) );
+		$applepay_script_url = rtrim( $base_url, '/' ) . '/applepay?data=' . rawurlencode( (string) $token );
+		$checkout_url        = function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : home_url( '/' );
+
+		self::register_apple_page_assets( $applepay_script_url, $checkout_url );
 
 		header( 'Content-Type: text/html; charset=utf-8' );
-		// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
-		echo '<!DOCTYPE html>
+		?>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>' . $site_name . ' — Apple Pay</title>
-<link rel="preload" href="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js" as="script" crossorigin="anonymous">
-<link rel="preload" href="' . $applepay_script_url . '" as="script">
-<style>
-*{box-sizing:border-box;margin:0;padding:0}
-body{
- display:flex;align-items:center;justify-content:center;
- min-height:100vh;background:#000;color:#fff;
- font-family:-apple-system,BlinkMacSystemFont,"Helvetica Neue",sans-serif;
-}
-.wrap{text-align:center;padding:2rem;max-width:380px;width:100%}
-#hap-loading{display:none}
-#hap-unavailable,#hap-cancelled,#hap-error{
- display:none;
- font-size:.95rem;
- line-height:1.5;
- opacity:.92;
- margin-top:1rem;
-}
-#applePayment{margin-top:0}
-.applePaybtn{
- display:block;width:100%;height:52px;padding:0;
- background:#fff;color:transparent;border:none;border-radius:10px;
- cursor:pointer;-webkit-appearance:none;appearance:none;
- background-image:-webkit-named-image(apple-pay-logo-black);
- background-repeat:no-repeat;background-position:center;
- background-size:auto 60%;
- font-size:0;line-height:0;text-indent:-9999px;overflow:hidden;
-}
-.applePaybtn:active{opacity:.8}
-</style>
+<title><?php echo esc_html( get_bloginfo( 'name' ) ); ?> — Apple Pay</title>
+<link rel="preload" href="<?php echo esc_url( self::APPLE_SDK_URL ); ?>" as="script" crossorigin="anonymous">
+<link rel="preload" href="<?php echo esc_url( $applepay_script_url ); ?>" as="script">
+		<?php wp_print_styles( self::APPLE_PAGE_STYLE ); ?>
 </head>
 <body>
 <div class="wrap">
- <div id="hap-loading"></div>
- <div id="hap-unavailable">Apple Pay Not Enabled for selected method.</div>
- <div id="hap-cancelled"></div>
- <div id="hap-error"></div>
-
- <!--
-   Required DOM structure for Hesabe Apple Pay script (applepay.blade.php):
-     #applePayment  — shown by Hesabe script when canMakePaymentsWithActiveCard() = true
-     .applePaybtn   — click handler is attached here by Hesabe script
- -->
- <div id="applePayment" style="display:none">
-  <button class="applePaybtn" type="button" aria-label="Pay with Apple Pay"></button>
- </div>
-
+<div id="hap-loading"></div>
+<div id="hap-unavailable"><?php esc_html_e( 'Apple Pay Not Enabled for selected method.', 'hesabe-for-woocommerce' ); ?></div>
+<div id="hap-cancelled"></div>
+<div id="hap-error"></div>
+<div id="applePayment" style="display:none">
+<button class="applePaybtn" type="button" aria-label="<?php esc_attr_e( 'Pay with Apple Pay', 'hesabe-for-woocommerce' ); ?>"></button>
 </div>
-
-<!-- Step 1: Apple Pay SDK -->
-<script src="https://applepay.cdn-apple.com/jsapi/v1/apple-pay-sdk.js" crossorigin="anonymous"></script>
-
-<!--
-  Step 2: Patch ApplePaySession BEFORE Hesabe script runs.
-
-  Root cause of "stuck on Processing / Payment Failed":
-    Hesabe applepay.blade.php has a bug — it does window.location.href = paymentUrl
-    inside a Promise that never resolves, so applePaySession.completePayment() is
-    never called. Apple Pay waits 30 s for the merchant response, then times out
-    with "Payment Failed." The actual payment may have succeeded on Hesabe side.
-
-  Fix: wrap the ApplePaySession constructor so that every new session:
-    (a) registers a beforeunload listener that calls completePayment(SUCCESS)
-        the instant the page begins navigating away — before JS context tears down.
-    (b) intercepts the oncancel setter to redirect the user back to checkout
-        instead of leaving them stranded on this page.
--->
-<script>
-(function(){
- if(!window.ApplePaySession) return;
-
- var _Orig        = window.ApplePaySession;
- var STATUS_OK    = _Orig.STATUS_SUCCESS;
- var checkoutUrl  = \'' . $checkout_url . '\';
-
- function HesabePatchedSession(version, paymentRequest) {
-  /* Create the real session via the original constructor. */
-  var session = new _Orig(version, paymentRequest);
-  var done = false;
-
-  /* Called once — either from beforeunload (navigation) or explicitly. */
-  function completeOnce() {
-   if(done) return;
-   done = true;
-   try { session.completePayment(STATUS_OK); } catch(e){}
-   window.removeEventListener("beforeunload", completeOnce);
-  }
-
-  /* When the page navigates away (Hesabe script sets window.location.href),
-     signal Apple Pay SUCCESS before the JS context is torn down. */
-  window.addEventListener("beforeunload", completeOnce);
-
-  /*
-   * Override the oncancel setter so we can intercept cancellations.
-   * Hesabe script does:  applePaySession.oncancel = function(e){…}
-   * We wrap that assignment to also show the "cancelled" UI + redirect.
-   */
-  var _cancelFn = null;
-  Object.defineProperty(session, "oncancel", {
-   get: function(){ return _cancelFn; },
-   set: function(fn){
-    _cancelFn = function(event){
-     done = true; /* prevent completePayment from beforeunload */
-     window.removeEventListener("beforeunload", completeOnce);
-     if(typeof fn === "function"){ try{ fn(event); }catch(e){} }
-     /* Show cancelled UI then redirect back to checkout. */
-     var loadEl = document.getElementById("hap-loading");
-     var cancelEl = document.getElementById("hap-cancelled");
-     if(loadEl)  loadEl.style.display  = "none";
-     if(cancelEl) cancelEl.style.display = "block";
-     setTimeout(function(){ window.location.href = checkoutUrl; }, 3000);
-    };
-   },
-   configurable: true
-  });
-
-  return session; /* new operator returns this object, not `this` */
- }
-
- /* Copy prototype and all static properties (STATUS_SUCCESS, STATUS_FAILURE,
-    canMakePayments, canMakePaymentsWithActiveCard, etc.) */
- HesabePatchedSession.prototype = _Orig.prototype;
- try {
-  Object.getOwnPropertyNames(_Orig).forEach(function(name){
-   if(name === "prototype" || name === "length" || name === "name") return;
-   try{
-    var d = Object.getOwnPropertyDescriptor(_Orig, name);
-    if(!d) return;
-    Object.defineProperty(HesabePatchedSession, name,
-     typeof d.value === "function"
-      ? { value: d.value.bind(_Orig), writable:true, configurable:true, enumerable:d.enumerable }
-      : d
-    );
-   }catch(e){}
-  });
- }catch(e){}
-
- window.ApplePaySession = HesabePatchedSession;
-})();
-</script>
-
-<!-- Step 3: Hesabe init script — rendered JS with payment token and merchant config baked in -->
-<script src="' . $applepay_script_url . '"></script>
-
-<!-- Step 4: Auto-trigger wallet + unavailability fallback -->
-<script>
-(function(){
- var loadEl    = document.getElementById("hap-loading");
- var unavailEl = document.getElementById("hap-unavailable");
- var apDiv     = document.getElementById("applePayment");
-
- function showUnavailable(){
-  if(loadEl)   loadEl.style.display   = "none";
-  if(unavailEl) unavailEl.style.display = "block";
- }
-
- if(typeof ApplePaySession === "undefined"){
-  showUnavailable();
-  return;
- }
-
- function triggerWallet(){
-  var btn = apDiv.querySelector(".applePaybtn");
-  if(btn) btn.click();
- }
-
- var observer = new MutationObserver(function(){
-  if(apDiv.style.display !== "none"){
-   observer.disconnect();
-   triggerWallet();
-  }
- });
- observer.observe(apDiv, {attributes:true, attributeFilter:["style"]});
-
- if(apDiv.style.display !== "none"){
-  observer.disconnect();
-  triggerWallet();
-  return;
- }
-
- setTimeout(function(){
-  observer.disconnect();
-  if(apDiv.style.display === "none") showUnavailable();
- }, 8000);
-
-})();
-</script>
+</div>
+		<?php wp_print_scripts( self::APPLE_WALLET_SCRIPT ); ?>
 </body>
-</html>';
-		// phpcs:enable
+</html>
+		<?php
 		exit;
+	}
+
+	/**
+	 * Registers the Apple Pay page's stylesheet and its four scripts. Printing the last script
+	 * prints all four, in the order they must run:
+	 *
+	 *  1. Apple's Apple Pay SDK.
+	 *  2. hesabe-apple-pay-session.js wraps ApplePaySession before Hesabe's script creates one.
+	 *  3. Hesabe's /applepay script for this payment.
+	 *  4. hesabe-apple-pay-wallet.js opens the wallet once Hesabe's script shows the button.
+	 *
+	 * Apple's SDK and Hesabe's script are registered without a version, so WordPress adds no
+	 * `ver` argument to the two remote URLs.
+	 *
+	 * @param string $applepay_script_url Hesabe's /applepay script for this payment.
+	 * @param string $checkout_url        Where a customer who cancels the sheet is sent back to.
+	 */
+	private static function register_apple_page_assets( $applepay_script_url, $checkout_url ) {
+		wp_register_style(
+			self::APPLE_PAGE_STYLE,
+			HESABE_WC_URL . 'assets/css/hesabe-apple-pay.css',
+			array(),
+			HESABE_WC_VERSION
+		);
+
+		// phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- Apple's URL carries its own version (v1).
+		wp_register_script( self::APPLE_SDK_SCRIPT, self::APPLE_SDK_URL, array(), null, true );
+		add_filter( 'script_loader_tag', array( __CLASS__, 'apple_sdk_crossorigin' ), 10, 2 );
+
+		wp_register_script(
+			self::APPLE_SESSION_SCRIPT,
+			HESABE_WC_URL . 'assets/js/hesabe-apple-pay-session.js',
+			array( self::APPLE_SDK_SCRIPT ),
+			HESABE_WC_VERSION,
+			true
+		);
+		wp_localize_script( self::APPLE_SESSION_SCRIPT, 'hesabeApplePayPage', array( 'checkoutUrl' => $checkout_url ) );
+
+		// phpcs:ignore WordPress.WP.EnqueuedResourceParameters.MissingVersion -- The URL names one payment; Hesabe's endpoint takes no other argument.
+		wp_register_script( self::APPLE_INIT_SCRIPT, $applepay_script_url, array( self::APPLE_SESSION_SCRIPT ), null, true );
+
+		wp_register_script(
+			self::APPLE_WALLET_SCRIPT,
+			HESABE_WC_URL . 'assets/js/hesabe-apple-pay-wallet.js',
+			array( self::APPLE_INIT_SCRIPT ),
+			HESABE_WC_VERSION,
+			true
+		);
+	}
+
+	/**
+	 * Adds `crossorigin="anonymous"` to the Apple Pay SDK's script tag, as Apple's own snippet
+	 * has it, and so the tag matches the page's preload hint.
+	 *
+	 * @param string $tag    The script tag.
+	 * @param string $handle The script's handle.
+	 * @return string
+	 */
+	public static function apple_sdk_crossorigin( $tag, $handle ) {
+		if ( self::APPLE_SDK_SCRIPT === $handle && false === strpos( $tag, 'crossorigin' ) ) {
+			$tag = str_replace( ' src=', ' crossorigin="anonymous" src=', $tag );
+		}
+		return $tag;
 	}
 
 	// -------------------------------------------------------------------------
