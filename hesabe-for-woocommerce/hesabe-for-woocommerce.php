@@ -73,8 +73,8 @@ function hesabe_wc_init() {
 	}
 
 	// Load only after WooCommerce defines WC_Payment_Gateway (avoid fatal if we load before WooCommerce).
-	require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe-shared.php';
-	require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe.php';
+	require_once HESABE_WC_PATH . 'includes/class-hesabe-wc-gateway-shared.php';
+	require_once HESABE_WC_PATH . 'includes/class-hesabe-wc-gateway.php';
 
 	add_filter( 'woocommerce_payment_gateways', 'hesabe_wc_add_gateway' );
 	Hesabe_WC_Settlement::register();
@@ -85,7 +85,7 @@ function hesabe_wc_init() {
  * @return array<string, string>
  */
 function hesabe_wc_add_gateway( $methods ) {
-	$methods[] = 'WC_Gateway_Hesabe';
+	$methods[] = 'Hesabe_WC_Gateway';
 	return $methods;
 }
 
@@ -101,9 +101,9 @@ function hesabe_wc_register_blocks_integration() {
 		return;
 	}
 
-	if ( class_exists( 'WC_Payment_Gateway' ) && ! class_exists( 'WC_Gateway_Hesabe', false ) ) {
-		require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe-shared.php';
-		require_once HESABE_WC_PATH . 'includes/class-wc-gateway-hesabe.php';
+	if ( class_exists( 'WC_Payment_Gateway' ) && ! class_exists( 'Hesabe_WC_Gateway', false ) ) {
+		require_once HESABE_WC_PATH . 'includes/class-hesabe-wc-gateway-shared.php';
+		require_once HESABE_WC_PATH . 'includes/class-hesabe-wc-gateway.php';
 	}
 
 	require_once HESABE_WC_PATH . 'includes/class-hesabe-blocks-support.php';

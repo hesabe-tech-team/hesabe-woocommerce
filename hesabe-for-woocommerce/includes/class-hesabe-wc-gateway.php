@@ -13,12 +13,12 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Main (and only) gateway class for Hesabe.
  */
-class WC_Gateway_Hesabe extends WC_Payment_Gateway {
+class Hesabe_WC_Gateway extends WC_Payment_Gateway {
 
 	use Hesabe_WC_Gateway_Shared;
 
 	/**
-	 * WC_Gateway_Hesabe constructor.
+	 * Hesabe_WC_Gateway constructor.
 	 */
 	public function __construct() {
 		$this->id                 = 'hesabe';
