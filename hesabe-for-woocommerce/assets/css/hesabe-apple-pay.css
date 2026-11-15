@@ -1,0 +1,70 @@
+/**
+ * Apple Pay page — the page the Checkout block sends the customer to, outside the theme.
+ */
+
+* {
+	box-sizing: border-box;
+	margin: 0;
+	padding: 0;
+}
+
+body {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 100vh;
+	background: #000;
+	color: #fff;
+	font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", sans-serif;
+}
+
+.wrap {
+	text-align: center;
+	padding: 2rem;
+	max-width: 380px;
+	width: 100%;
+}
+
+#hap-loading {
+	display: none;
+}
+
+#hap-unavailable,
+#hap-cancelled,
+#hap-error {
+	display: none;
+	font-size: 0.95rem;
+	line-height: 1.5;
+	opacity: 0.92;
+	margin-top: 1rem;
+}
+
+#applePayment {
+	margin-top: 0;
+}
+
+.applePaybtn {
+	display: block;
+	width: 100%;
+	height: 52px;
+	padding: 0;
+	background: #fff;
+	color: transparent;
+	border: none;
+	border-radius: 10px;
+	cursor: pointer;
+	-webkit-appearance: none;
+	appearance: none;
+	background-image: -webkit-named-image(apple-pay-logo-black);
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: auto 60%;
+	font-size: 0;
+	line-height: 0;
+	text-indent: -9999px;
+	overflow: hidden;
+}
+
+.applePaybtn:active {
+	opacity: 0.8;
+}
