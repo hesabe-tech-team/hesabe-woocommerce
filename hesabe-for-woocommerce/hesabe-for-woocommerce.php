@@ -3,7 +3,7 @@
  * Plugin Name: Hesabe for WooCommerce
  * Plugin URI: https://hesabe.com/
  * Description: Hesabe payment gateway for WooCommerce — hosted Hesabe checkout or direct payment method selection (KNET, Visa/Mastercard, Apple Pay).
- * Version: 11.2.1
+ * Version: 11.2.2
  * Author: Hesabe
  * Text Domain: hesabe-for-woocommerce
  * Requires at least: 5.8
@@ -19,7 +19,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'HESABE_WC_VERSION', '11.2.1' );
+define( 'HESABE_WC_VERSION', '11.2.2' );
 define( 'HESABE_WC_FILE', __FILE__ );
 define( 'HESABE_WC_PATH', plugin_dir_path( __FILE__ ) );
 define( 'HESABE_WC_URL', plugin_dir_url( __FILE__ ) );
@@ -62,6 +62,20 @@ function hesabe_wc_declare_compatibility() {
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'custom_order_tables', HESABE_WC_FILE, true );
 		\Automattic\WooCommerce\Utilities\FeaturesUtil::declare_compatibility( 'cart_checkout_blocks', HESABE_WC_FILE, true );
 	}
+}
+
+/**
+ * One value of a decoded JSON document, as plain text.
+ *
+ * Hesabe's webhook, the customer's return and Hesabe's answers all arrive as JSON, and
+ * json_decode() sanitises nothing. Every value the plugin keeps, compares or writes into an
+ * order note passes through here first.
+ *
+ * @param mixed $value A decoded value.
+ * @return string The value as sanitised text, or '' when it is not a scalar.
+ */
+function hesabe_wc_text( $value ) {
+	return is_scalar( $value ) ? sanitize_text_field( (string) $value ) : '';
 }
 
 /**

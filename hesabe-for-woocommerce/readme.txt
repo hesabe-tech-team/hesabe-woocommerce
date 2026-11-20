@@ -1,9 +1,10 @@
 === Hesabe for WooCommerce ===
+Contributors: hesabeit
 Tags: payment gateway, knet, kuwait, apple pay, woocommerce
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 11.2.1
+Stable tag: 11.2.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -13,7 +14,7 @@ Accept KNET, Visa, Mastercard and Apple Pay in WooCommerce with Hesabe, on Hesab
 
 Hesabe for WooCommerce adds Hesabe, a payment gateway in Kuwait, to your shop as one payment method. Customers pay with KNET, Visa, Mastercard or Apple Pay, and the order is updated when Hesabe confirms the payment.
 
-The plugin needs WooCommerce and a Hesabe merchant account. It comes set up for Hesabe's public sandbox, so you can place test orders before you have live keys.
+The plugin needs WooCommerce and a Hesabe merchant account. It comes set up for Hesabe's public sandbox, so you can place test orders before you have live keys. Sandbox payments are test payments and move no money: set `Environment` to Production, with your own keys, before you take real orders.
 
 = Two ways to show Hesabe at checkout =
 
@@ -30,13 +31,13 @@ The plugin needs WooCommerce and a Hesabe merchant account. It comes set up for 
 
 = How an order gets its status =
 
-Three things update a Hesabe order:
+Three things update a Hesabe order, and none of them marks it paid on its own word. An order is paid when Hesabe confirms a payment that the order itself started, for the order's amount.
 
-1. **The customer's return.** When the customer comes back from Hesabe, the order is marked paid, or failed when the payment did not go through.
+1. **The customer's return.** When the customer comes back from Hesabe, the plugin asks Hesabe's Transaction Enquiry about the order and marks it paid when Hesabe confirms the payment. A customer who cancelled or was declined comes back to a failed order. A return for an order paid with another payment method, or one that does not belong to the order, changes nothing.
 2. **Hesabe's webhook.** Hesabe posts the result of every payment to the shop. It updates the order when the customer never comes back, for example after closing the browser on Hesabe's page. Hesabe signs the webhook with your access code, and the plugin ignores a webhook whose signature does not match.
 3. **Check Hesabe payment status.** An order action that asks Hesabe's Transaction Enquiry about the order and applies the answer.
 
-A paid order is never marked failed. When Hesabe and the order disagree, such as a different amount, the order is not changed and an order note says why.
+A paid order is never marked failed. When Hesabe and the order disagree, such as a different amount, the order is not changed and an order note says why. When Hesabe cannot be reached as the customer comes back, the order waits for the webhook, or for `Check Hesabe payment status`.
 
 == External services ==
 
@@ -49,7 +50,7 @@ The plugin talks to `sandbox.hesabe.com` when `Environment` is Sandbox and to `a
 * When a customer places an order with Hesabe as the payment method, your server sends Hesabe a checkout request, encrypted with your keys. It holds your merchant code, the order number and amount, the customer's name, phone number and email address from the billing details, the WooCommerce version, and the addresses Hesabe returns the customer and posts the webhook to. For Apple Pay, and for orders in another currency with `Currency converter` on, it also holds the order's currency. For Apple Pay it holds your shop's domain.
 * The customer's browser then goes to Hesabe's payment page. Card details are entered there and never reach your shop.
 * Hesabe sends the customer back to your shop with the result, and posts the result to your shop's webhook address.
-* When a customer comes back to an order the webhook has already updated, and when you run `Check Hesabe payment status`, your server asks Hesabe about the order. It sends the order number and your access code.
+* When a customer comes back from Hesabe's payment page, and when you run `Check Hesabe payment status`, your server asks Hesabe about the order. It sends the order number and your access code.
 * With Apple Pay, your server and the customer's browser also load Hesabe's Apple Pay script for the payment, and the browser asks Hesabe to validate your shop's domain with Apple.
 
 Hesabe's [terms and conditions](https://hesabe.com/terms.html) and [privacy policy](https://hesabe.com/privacy.html).
@@ -116,6 +117,11 @@ The message, and the order note, give Hesabe's reason. For example, Hesabe refus
 Against Hesabe's sandbox in November 2026, with KNET and Visa / Mastercard in Hosted and Direct mode, on the Checkout block and the classic checkout: WordPress 7.1.4 with WooCommerce 11.3.0 and 11.2.2 on PHP 8.5, and WordPress 6.9.4 with WooCommerce 10.7.0 on PHP 8.3.
 
 == Changelog ==
+
+= 11.2.2 =
+* The customer's return no longer marks an order paid by itself: the plugin confirms the payment with Hesabe's Transaction Enquiry first, for one of the order's own checkouts and for the order's amount.
+* A return changes only an order paid with Hesabe, and only when it belongs to that order.
+* Values from the webhook, the return and Hesabe's answers are sanitised before they are stored or written into an order note.
 
 = 11.2.1 =
 * Licensed under GPLv2 or later, with a readme for the WordPress.org Plugin Directory.

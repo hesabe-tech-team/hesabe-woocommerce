@@ -11,13 +11,18 @@ defined( 'ABSPATH' ) || exit;
  * Applies what Hesabe reports about a payment to its order.
  *
  * Three things report a payment: the customer's return, Hesabe's webhook and the "Check Hesabe
- * payment status" order action. The return comes first: it decides an order still awaiting
- * payment from what it carried, as the plugin always has. The webhook is the backup for a
- * customer who never comes back, whose order WooCommerce would otherwise cancel when its
- * "Hold stock" time runs out. The two often land within a second of each other, and Hesabe
- * retries a webhook, so every change happens under a per-order lock. When the webhook settled
- * the order before the customer came back, the return checks it again with the Transaction
- * Enquiry. A failure report never changes a paid order.
+ * payment status" order action. None of them marks an order paid on its own word. An order is
+ * paid when Hesabe says so, in a webhook Hesabe signed or in its answer to the Transaction
+ * Enquiry, and only for a payment the order itself started: one of the order's checkout tokens,
+ * for the order's total. An order from before the plugin kept tokens (11.2) is matched by time
+ * and amount instead, see own_attempts().
+ *
+ * The return comes first: it sets off the Transaction Enquiry while the customer waits, so the
+ * customer's page shows the order as Hesabe has it. The webhook is the backup for a customer
+ * who never comes back, whose order WooCommerce would otherwise cancel when its "Hold stock"
+ * time runs out. The two often land within a second of each other, and Hesabe retries a
+ * webhook, so every change happens under a per-order lock. A failure report never changes a
+ * paid order, and only an order paid with this plugin is ever changed.
  */
 class Hesabe_WC_Settlement {
 
@@ -51,11 +56,14 @@ class Hesabe_WC_Settlement {
 	/** No Hesabe order has this ID. */
 	const NOT_FOUND = 'not_found';
 
-	/** The customer came back to an order the webhook had already settled. */
-	const SETTLED_BEFORE_RETURN = 'settled_before_return';
+	/** The return says something only Hesabe can confirm; nothing changed yet. */
+	const UNCONFIRMED = 'unconfirmed';
 
 	/** Order meta holding the tokens of the order's checkouts. */
 	const TOKENS_META = '_hesabe_checkout_tokens';
+
+	/** Order meta holding, for each token, the total and currency its checkout was started for. */
+	const AMOUNTS_META = '_hesabe_checkout_amounts';
 
 	/** The order action's key. */
 	const ORDER_ACTION = 'hesabe_check_payment_status';
@@ -78,20 +86,33 @@ class Hesabe_WC_Settlement {
 	/**
 	 * Keeps the token Hesabe returned for a checkout of the order: it names the payment in the
 	 * webhook and the Transaction Enquiry. A customer who comes back from Hesabe's page and pays
-	 * again from "Pay for order" gets a new checkout, so every token is kept.
+	 * again from "Pay for order" gets a new checkout, so every token is kept, each with the
+	 * total and currency its checkout was started for.
 	 *
 	 * @param WC_Order $order Order.
 	 * @param string   $token The checkout answer's `token`.
 	 */
 	public static function remember_checkout( WC_Order $order, $token ) {
-		$token = (string) $token;
+		$token = hesabe_wc_text( $token );
 		if ( '' === $token ) {
 			return;
 		}
-		$tokens   = self::checkout_tokens( $order );
-		$tokens[] = $token;
+		$tokens            = self::checkout_tokens( $order );
+		$tokens[]          = $token;
+		$amounts           = self::checkout_amounts( $order );
+		$amounts[ $token ] = self::order_amount( $order );
 		$order->update_meta_data( self::TOKENS_META, array_values( array_unique( $tokens ) ) );
+		$order->update_meta_data( self::AMOUNTS_META, $amounts );
 		$order->save();
+	}
+
+	/**
+	 * @param WC_Order $order Order.
+	 * @param string   $token A payment token, from a return, a webhook or the enquiry.
+	 * @return bool Whether the token names a checkout this order started.
+	 */
+	public static function started_checkout( WC_Order $order, $token ) {
+		return '' !== (string) $token && in_array( (string) $token, self::checkout_tokens( $order ), true );
 	}
 
 	/**
@@ -103,41 +124,40 @@ class Hesabe_WC_Settlement {
 	}
 
 	/**
-	 * Applies the customer's return, as the return page always has: a successful return marks
-	 * an unpaid order paid, a failed one marks an order awaiting payment failed. An order the
-	 * webhook settled first is checked again with the Transaction Enquiry.
+	 * Applies the customer's return.
 	 *
-	 * @param int    $order_id  Order ID from the return.
-	 * @param bool   $succeeded Whether the return reports a successful payment.
-	 * @param object $info      The return's `response`.
+	 * A return decides nothing by itself. It is encrypted with the merchant's keys, which shows
+	 * who could have written it and nothing more, and the sandbox keys are public. So a return
+	 * that reports a payment only sets off the Transaction Enquiry, and the order is marked paid
+	 * when Hesabe lists a successful payment for one of the order's own checkouts with the right
+	 * amount: the rules of apply(). The same enquiry checks an order the webhook settled first.
+	 *
+	 * A failed return fails an order awaiting payment, which is all a customer who cancels or
+	 * is declined can do to their own order. A payment Hesabe confirms later still completes it.
+	 *
+	 * The caller has established that the return is the order's own, see
+	 * Hesabe_WC_Return_Handler::handle_return().
+	 *
+	 * @param int  $order_id  Order ID from the return.
+	 * @param bool $succeeded Whether the return reports a successful payment.
 	 * @return bool Whether the order is paid afterwards; the customer's page follows it.
 	 */
-	public static function from_return( $order_id, $succeeded, $info ) {
+	public static function from_return( $order_id, $succeeded ) {
 		$outcome = self::locked(
 			$order_id,
-			function ( WC_Order $order ) use ( $succeeded, $info ) {
-				if ( $succeeded && ! $order->is_paid() ) {
-					$order->payment_complete();
-					if ( isset( $info->paymentId ) ) {
-						$order->update_meta_data( '_hesabe_payment_id', sanitize_text_field( (string) $info->paymentId ) );
-						$order->save();
-					}
-					return self::PAID;
+			function ( WC_Order $order ) use ( $succeeded ) {
+				if ( ! self::is_hesabe_order( $order ) ) {
+					return self::NOT_FOUND;
 				}
 				if ( ! $succeeded && $order->has_status( 'pending' ) ) {
 					$order->update_status( 'failed', __( 'Hesabe payment failed or declined.', 'hesabe-for-woocommerce' ) );
 					return self::FAILED;
 				}
-				// The webhook carries no payment ID; the return that follows it does.
-				if ( $succeeded && isset( $info->paymentId ) && '' === (string) $order->get_meta( '_hesabe_payment_id', true ) ) {
-					$order->update_meta_data( '_hesabe_payment_id', sanitize_text_field( (string) $info->paymentId ) );
-					$order->save();
-				}
-				return self::SETTLED_BEFORE_RETURN;
+				return self::UNCONFIRMED;
 			}
 		);
 
-		if ( self::SETTLED_BEFORE_RETURN === $outcome ) {
+		if ( self::UNCONFIRMED === $outcome ) {
 			self::enquire( $order_id, __( 'Transaction Enquiry on the customer\'s return', 'hesabe-for-woocommerce' ), true );
 		}
 		$order = self::fresh_order( $order_id );
@@ -146,9 +166,9 @@ class Hesabe_WC_Settlement {
 
 	/**
 	 * Applies a webhook whose signature has been checked. Everything read from it is covered by
-	 * the signature.
+	 * the signature, and Hesabe_WC_Webhook has sanitised it.
 	 *
-	 * @param array<string, mixed> $webhook The decoded body.
+	 * @param array<string, string> $webhook The webhook's fields, sanitised.
 	 * @return string One of the outcome constants.
 	 */
 	public static function from_webhook( array $webhook ) {
@@ -165,7 +185,7 @@ class Hesabe_WC_Settlement {
 					return self::NOT_FOUND;
 				}
 				$token = isset( $webhook['token'] ) ? (string) $webhook['token'] : '';
-				if ( ! in_array( $token, self::checkout_tokens( $order ), true ) ) {
+				if ( ! self::started_checkout( $order, $token ) ) {
 					/* translators: %s: Hesabe's payment token */
 					$order->add_order_note( sprintf( __( 'Hesabe webhook for a payment this order did not start (token %s). Nothing was changed.', 'hesabe-for-woocommerce' ), $token ) );
 					return self::IGNORED;
@@ -237,6 +257,9 @@ class Hesabe_WC_Settlement {
 		return self::locked(
 			$order_id,
 			function ( WC_Order $order ) use ( $attempts, $source, $note_agreement ) {
+				if ( ! self::is_hesabe_order( $order ) ) {
+					return self::NOT_FOUND;
+				}
 				$record = self::pick( self::own_attempts( $order, $attempts ) );
 				if ( null === $record ) {
 					if ( ! $order->is_paid() ) {
@@ -253,7 +276,7 @@ class Hesabe_WC_Settlement {
 					return self::conflict( $order, sprintf( __( 'Hesabe has no successful payment for this order (%1$s: latest attempt %2$s, token %3$s), but the order is paid. Check it in the Hesabe Merchant Panel.', 'hesabe-for-woocommerce' ), $source, self::status( $record ), $token ) );
 				}
 
-				$outcome = self::apply( $order, $record, $source, in_array( $token, self::checkout_tokens( $order ), true ) );
+				$outcome = self::apply( $order, $record, $source, self::started_checkout( $order, $token ) );
 				if ( self::ALREADY_PAID === $outcome && ! empty( $record['PaymentID'] ) && is_scalar( $record['PaymentID'] ) && '' === (string) $order->get_meta( '_hesabe_payment_id', true ) ) {
 					// An order the webhook paid has no payment ID; the enquiry has it.
 					$order->update_meta_data( '_hesabe_payment_id', sanitize_text_field( (string) $record['PaymentID'] ) );
@@ -281,7 +304,8 @@ class Hesabe_WC_Settlement {
 	 * The amount must match the order total. An order in another currency is the exception:
 	 * Hesabe reports the amount it charged in KWD after converting (1.00 USD came back as
 	 * 0.311, sandbox, November 2026), so for it the record must be one of the order's own
-	 * checkouts instead, which carried the order's amount and currency.
+	 * checkouts instead, and that checkout must have been started for the total and currency
+	 * the order has now.
 	 *
 	 * @param WC_Order             $order    Order, fresh and locked.
 	 * @param array<string, mixed> $record   Hesabe's record: `status`, `amount`, `token`, ...
@@ -311,6 +335,12 @@ class Hesabe_WC_Settlement {
 			if ( null === $amount || ( $amount !== $total && ! ( $converted && $own_token ) ) ) {
 				/* translators: 1: Hesabe's amount, 2: what reported it, 3: Hesabe's payment token, 4: order total, 5: order currency */
 				return self::conflict( $order, sprintf( __( 'Hesabe reports a payment of %1$s (%2$s, token %3$s) for this order of %4$s %5$s. The order was not changed.', 'hesabe-for-woocommerce' ), null === $amount ? '?' : $amount, $source, $token, $order->get_total(), $order->get_currency() ) );
+			}
+			$started_for = self::checkout_amounts( $order );
+			// A checkout started before the plugin kept the amounts (11.2.1 and earlier) has none.
+			if ( $converted && isset( $started_for[ $token ] ) && self::order_amount( $order ) !== $started_for[ $token ] ) {
+				/* translators: 1: what reported it, 2: Hesabe's payment token, 3: the checkout's amount and currency, 4: order total, 5: order currency */
+				return self::conflict( $order, sprintf( __( 'Hesabe reports a payment (%1$s, token %2$s) for a checkout of %3$s, but the order is now %4$s %5$s. The order was not changed.', 'hesabe-for-woocommerce' ), $source, $token, $started_for[ $token ], $order->get_total(), $order->get_currency() ) );
 			}
 			if ( $amount !== $total ) {
 				/* translators: 1: what reported it, 2: Hesabe's payment token, 3: amount charged in KWD, 4: order total, 5: order currency */
@@ -411,6 +441,23 @@ class Hesabe_WC_Settlement {
 	private static function checkout_tokens( WC_Order $order ) {
 		$tokens = $order->get_meta( self::TOKENS_META, true );
 		return is_array( $tokens ) ? array_values( array_map( 'strval', $tokens ) ) : array();
+	}
+
+	/**
+	 * @param WC_Order $order Order.
+	 * @return array<string, string> For each checkout token, the total and currency it was started for.
+	 */
+	private static function checkout_amounts( WC_Order $order ) {
+		$amounts = $order->get_meta( self::AMOUNTS_META, true );
+		return is_array( $amounts ) ? array_map( 'strval', $amounts ) : array();
+	}
+
+	/**
+	 * @param WC_Order $order Order.
+	 * @return string The order's total and currency as a checkout sends them, such as `1.000 KWD`.
+	 */
+	private static function order_amount( WC_Order $order ) {
+		return self::amount( $order->get_total() ) . ' ' . strtoupper( (string) $order->get_currency() );
 	}
 
 	/**
