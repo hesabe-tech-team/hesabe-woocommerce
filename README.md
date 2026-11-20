@@ -11,7 +11,7 @@ plugin calls.
 
 ## Plugin Version
 
-- Current plugin version: `11.2.1`
+- Current plugin version: `11.2.2`
 
 ## Compatibility / Supported Versions
 
@@ -92,10 +92,12 @@ Configure:
 
 ## Payment Status Updates
 
-Three things update a Hesabe order:
+Three things update a Hesabe order, and none of them marks it paid on its own word. An order
+is paid when Hesabe confirms a payment that the order itself started, for the order's amount.
 
-1. The customer's return. When the customer comes back from Hesabe, the order is marked
-   paid, or failed when the payment did not go through.
+1. The customer's return. When the customer comes back from Hesabe, the plugin asks Hesabe's
+   Transaction Enquiry about the order and marks it paid when Hesabe confirms the payment. A
+   customer who cancelled or was declined comes back to a failed order.
 2. Hesabe's webhook. Every payment asks Hesabe to post the result to:
    - `https://your-shop.example.com/wc-api/wc_hesabe_webhook/`
    - `https://your-shop.example.com/?wc-api=wc_hesabe_webhook` with plain permalinks
@@ -109,14 +111,25 @@ Three things update a Hesabe order:
 3. `Check Hesabe payment status`. On the order page, choose it under `Order actions` and
    press `Update`. The plugin asks Hesabe's Transaction Enquiry and applies its answer.
 
-The return comes first. When the webhook has already updated the order, the return checks
-it again with the Transaction Enquiry. A paid order is never marked failed. When Hesabe
-confirms a payment, a pending, failed or cancelled order is marked paid, as WooCommerce
-does for any gateway. Each update adds an order note naming what reported it and Hesabe's
+The return comes first, and Hesabe decides. The return is encrypted with the merchant's
+keys, which does not prove that Hesabe wrote it, and the sandbox keys are public. So the
+return only sets off the Transaction Enquiry, and it must belong to the order: it carries
+one of the order's payment tokens, or the visitor is the customer who placed the order. A
+return for an order paid with another payment method, or one that does not belong to the
+order, changes nothing and is sent to the checkout page. When Hesabe cannot be reached as
+the customer comes back, the order waits for the webhook or for `Check Hesabe payment
+status`.
+
+A paid order is never marked failed. When Hesabe confirms a payment, a pending, failed or
+cancelled order is marked paid, as WooCommerce does for any gateway. Each update adds an order note naming what reported it and Hesabe's
 payment token. When Hesabe and the order disagree, such as a different amount, the order
 is not changed and its note says why. For an order in another currency with `Currency
 converter` on, Hesabe reports the amount it charged in KWD, which the note shows next to
-the order total.
+the order total. Such a payment counts only when its checkout was started for the total
+and currency the order has now.
+
+In Sandbox, payments are test payments and move no money. Set `Environment` to Production
+before taking real orders.
 
 ## Apple Pay Notes
 
