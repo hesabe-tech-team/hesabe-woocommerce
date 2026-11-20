@@ -359,15 +359,14 @@ class Hesabe_WC_Return_Handler {
 			exit;
 		}
 
-		$json = json_decode( $decrypted );
-		if ( ! $json || ! isset( $json->response ) ) {
+		$fields = self::return_fields( json_decode( $decrypted, true, 512, JSON_BIGINT_AS_STRING ) );
+		if ( null === $fields ) {
 			wc_add_notice( $message, $msg_class );
 			wp_safe_redirect( wc_get_checkout_url() );
 			exit;
 		}
 
-		$info     = $json->response;
-		$order_id = isset( $info->variable1 ) ? absint( $info->variable1 ) : 0;
+		$order_id = $fields['order_id'];
 		$order    = $order_id ? wc_get_order( $order_id ) : false;
 
 		if ( ! $order ) {
@@ -376,22 +375,15 @@ class Hesabe_WC_Return_Handler {
 			exit;
 		}
 
-		$order_status = isset( $info->resultCode ) ? (string) $info->resultCode : '';
-		$order->add_order_note(
-			sprintf(
-				'Hesabe return: %s | amount: %s',
-				$order_status,
-				isset( $info->amount ) ? (string) $info->amount : ''
-			)
-		);
+		$order->add_order_note( sprintf( 'Hesabe return: %s | amount: %s', $fields['result'], $fields['amount'] ) );
 
-		$ok = ! empty( $json->status )
-			&& in_array( $order_status, array( 'CAPTURED', 'ACCEPT', 'AUTHORIZED', 'PARTIALLY_CAPTURED', 'SUCCESS' ), true );
+		$ok = $fields['succeeded']
+			&& in_array( $fields['result'], array( 'CAPTURED', 'ACCEPT', 'AUTHORIZED', 'PARTIALLY_CAPTURED', 'SUCCESS' ), true );
 
 		// The return decides an order still awaiting payment. An order the webhook settled
 		// first is checked again with the Transaction Enquiry, and a failed return never
 		// changes a paid order, so the customer's page follows Hesabe's latest status.
-		$paid = Hesabe_WC_Settlement::from_return( $order_id, $ok, $info );
+		$paid = Hesabe_WC_Settlement::from_return( $order_id, $ok, $fields );
 
 		if ( $paid ) {
 			$msg_class = 'success';
@@ -425,6 +417,34 @@ class Hesabe_WC_Return_Handler {
 			wp_safe_redirect( wc_get_checkout_url() );
 		}
 		exit;
+	}
+
+	/**
+	 * The fields of a decrypted return the plugin acts on, each sanitised.
+	 *
+	 * Decrypting the return shows that it was encrypted with the merchant's keys; json_decode()
+	 * sanitises nothing. The rest of the return, the customer's details included, goes no
+	 * further.
+	 *
+	 * @param mixed $json The decoded return.
+	 * @return array{order_id:int,succeeded:bool,result:string,amount:string,payment_id:string}|null
+	 *         Null when it is not a return.
+	 */
+	private static function return_fields( $json ) {
+		if ( ! is_array( $json ) || ! isset( $json['response'] ) || ! is_array( $json['response'] ) ) {
+			return null;
+		}
+		$response = $json['response'];
+		$text     = function ( $name ) use ( $response ) {
+			return hesabe_wc_text( isset( $response[ $name ] ) ? $response[ $name ] : '' );
+		};
+		return array(
+			'order_id'   => absint( $text( 'variable1' ) ),
+			'succeeded'  => ! empty( $json['status'] ),
+			'result'     => $text( 'resultCode' ),
+			'amount'     => $text( 'amount' ),
+			'payment_id' => $text( 'paymentId' ),
+		);
 	}
 }
 
@@ -505,16 +525,17 @@ trait Hesabe_WC_Gateway_Shared {
 		}
 
 		if ( empty( $result->status ) || (int) $result->status !== 1 || empty( $result->response->data ) ) {
-			$code    = isset( $result->code )    ? (string) $result->code    : '';
-			$message = isset( $result->message ) ? (string) $result->message : __( 'Unknown error', 'hesabe-for-woocommerce' );
+			// Hesabe's answer is decoded JSON, so each value is sanitised before it is kept or shown.
+			$code    = isset( $result->code ) ? hesabe_wc_text( $result->code ) : '';
+			$message = isset( $result->message ) ? hesabe_wc_text( $result->message ) : __( 'Unknown error', 'hesabe-for-woocommerce' );
 			$order->add_order_note(
 				sprintf(
 					'Hesabe checkout failed — status: %s | code: %s | message: %s | paymentType: %s | raw: %s',
-					isset( $result->status ) ? (string) $result->status : '',
+					isset( $result->status ) ? hesabe_wc_text( $result->status ) : '',
 					$code,
 					$message,
 					$payment_type,
-					wp_json_encode( $result )
+					hesabe_wc_text( wp_json_encode( $result ) )
 				)
 			);
 			/* translators: 1: Hesabe's error code, 2: Hesabe's error message */

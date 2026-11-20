@@ -84,7 +84,7 @@ class Hesabe_WC_Settlement {
 	 * @param string   $token The checkout answer's `token`.
 	 */
 	public static function remember_checkout( WC_Order $order, $token ) {
-		$token = (string) $token;
+		$token = hesabe_wc_text( $token );
 		if ( '' === $token ) {
 			return;
 		}
@@ -107,19 +107,20 @@ class Hesabe_WC_Settlement {
 	 * an unpaid order paid, a failed one marks an order awaiting payment failed. An order the
 	 * webhook settled first is checked again with the Transaction Enquiry.
 	 *
-	 * @param int    $order_id  Order ID from the return.
-	 * @param bool   $succeeded Whether the return reports a successful payment.
-	 * @param object $info      The return's `response`.
+	 * @param int                   $order_id  Order ID from the return.
+	 * @param bool                  $succeeded Whether the return reports a successful payment.
+	 * @param array<string, string> $fields    The return's fields, sanitised.
 	 * @return bool Whether the order is paid afterwards; the customer's page follows it.
 	 */
-	public static function from_return( $order_id, $succeeded, $info ) {
-		$outcome = self::locked(
+	public static function from_return( $order_id, $succeeded, array $fields ) {
+		$payment_id = isset( $fields['payment_id'] ) ? $fields['payment_id'] : '';
+		$outcome    = self::locked(
 			$order_id,
-			function ( WC_Order $order ) use ( $succeeded, $info ) {
+			function ( WC_Order $order ) use ( $succeeded, $payment_id ) {
 				if ( $succeeded && ! $order->is_paid() ) {
 					$order->payment_complete();
-					if ( isset( $info->paymentId ) ) {
-						$order->update_meta_data( '_hesabe_payment_id', sanitize_text_field( (string) $info->paymentId ) );
+					if ( '' !== $payment_id ) {
+						$order->update_meta_data( '_hesabe_payment_id', $payment_id );
 						$order->save();
 					}
 					return self::PAID;
@@ -129,8 +130,8 @@ class Hesabe_WC_Settlement {
 					return self::FAILED;
 				}
 				// The webhook carries no payment ID; the return that follows it does.
-				if ( $succeeded && isset( $info->paymentId ) && '' === (string) $order->get_meta( '_hesabe_payment_id', true ) ) {
-					$order->update_meta_data( '_hesabe_payment_id', sanitize_text_field( (string) $info->paymentId ) );
+				if ( $succeeded && '' !== $payment_id && '' === (string) $order->get_meta( '_hesabe_payment_id', true ) ) {
+					$order->update_meta_data( '_hesabe_payment_id', $payment_id );
 					$order->save();
 				}
 				return self::SETTLED_BEFORE_RETURN;
@@ -146,9 +147,9 @@ class Hesabe_WC_Settlement {
 
 	/**
 	 * Applies a webhook whose signature has been checked. Everything read from it is covered by
-	 * the signature.
+	 * the signature, and Hesabe_WC_Webhook has sanitised it.
 	 *
-	 * @param array<string, mixed> $webhook The decoded body.
+	 * @param array<string, string> $webhook The webhook's fields, sanitised.
 	 * @return string One of the outcome constants.
 	 */
 	public static function from_webhook( array $webhook ) {

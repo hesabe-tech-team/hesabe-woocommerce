@@ -30,7 +30,7 @@ class Hesabe_WC_Enquiry {
 	 * number (November 2026); Hesabe_WC_Settlement keeps the order's own.
 	 *
 	 * @param string $reference The order reference sent at checkout: the order ID.
-	 * @return array<int, array<string, mixed>>|WP_Error An empty list when Hesabe has none.
+	 * @return array<int, array<string, string>>|WP_Error An empty list when Hesabe has none.
 	 */
 	public static function attempts( $reference ) {
 		$c        = Hesabe_WC_Config::credentials();
@@ -83,9 +83,24 @@ class Hesabe_WC_Enquiry {
 		$attempts = array();
 		foreach ( $records as $record ) {
 			if ( is_array( $record ) && isset( $record['reference_number'] ) && (string) $record['reference_number'] === (string) $reference ) {
-				$attempts[] = $record;
+				$attempts[] = self::fields( $record );
 			}
 		}
 		return $attempts;
+	}
+
+	/**
+	 * The fields of an attempt the plugin acts on, each sanitised as plain text. A record also
+	 * holds the customer's name, email, phone and card type, which the plugin has no use for.
+	 *
+	 * @param array<string, mixed> $record One record of Hesabe's answer.
+	 * @return array<string, string>
+	 */
+	private static function fields( array $record ) {
+		$fields = array();
+		foreach ( array( 'reference_number', 'token', 'status', 'amount', 'PaymentID', 'datetime' ) as $name ) {
+			$fields[ $name ] = hesabe_wc_text( isset( $record[ $name ] ) ? $record[ $name ] : '' );
+		}
+		return $fields;
 	}
 }

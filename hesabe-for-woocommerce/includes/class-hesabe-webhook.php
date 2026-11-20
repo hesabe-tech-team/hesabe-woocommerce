@@ -27,14 +27,17 @@ class Hesabe_WC_Webhook {
 			self::answer( 405, array( 'received' => false ) );
 		}
 
-		$webhook   = json_decode( (string) file_get_contents( 'php://input' ), true, 512, JSON_BIGINT_AS_STRING );
+		// The signature covers the body's values exactly as Hesabe sent them, so it is checked on
+		// the body as received. Nothing else reads that body: the plugin acts only on fields(),
+		// which sanitises each value it keeps.
+		$body      = json_decode( (string) file_get_contents( 'php://input' ), true, 512, JSON_BIGINT_AS_STRING );
 		$signature = isset( $_SERVER['HTTP_X_SIGNATURE'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_SIGNATURE'] ) ) : '';
-		if ( ! is_array( $webhook ) || ! self::is_signature_valid( $webhook, $signature ) ) {
+		if ( ! is_array( $body ) || ! self::is_signature_valid( $body, $signature ) ) {
 			wc_get_logger()->warning( 'Hesabe webhook refused: the signature is missing or does not match.', array( 'source' => 'hesabe' ) );
 			self::answer( 401, array( 'received' => false ) );
 		}
 
-		$outcome = Hesabe_WC_Settlement::from_webhook( $webhook );
+		$outcome = Hesabe_WC_Settlement::from_webhook( self::fields( $body ) );
 		if ( Hesabe_WC_Settlement::NOT_FOUND === $outcome ) {
 			self::answer( 404, array( 'received' => false ) );
 		}
@@ -48,6 +51,23 @@ class Hesabe_WC_Webhook {
 	}
 
 	/**
+	 * The four fields of a webhook the plugin acts on, each sanitised as plain text.
+	 *
+	 * A valid signature says who sent the values, not that they are safe to store or print, and
+	 * json_decode() sanitises nothing. The rest of the body, `blocks` included, goes no further.
+	 *
+	 * @param array<string, mixed> $body The decoded body, as received.
+	 * @return array{reference_number:string,token:string,status:string,amount:string}
+	 */
+	private static function fields( array $body ) {
+		$fields = array();
+		foreach ( array( 'reference_number', 'token', 'status', 'amount' ) as $name ) {
+			$fields[ $name ] = hesabe_wc_text( isset( $body[ $name ] ) ? $body[ $name ] : '' );
+		}
+		return $fields;
+	}
+
+	/**
 	 * Checks the `x-signature` header Hesabe puts on Checkout API 3.0 webhooks.
 	 *
 	 * As observed on the sandbox in November 2026: HMAC-SHA256 in lowercase hex, keyed with the
@@ -55,7 +75,7 @@ class Hesabe_WC_Webhook {
 	 * display layout), in the order Hesabe sends them, joined without a separator. Webhooks for
 	 * version 2.0 checkouts carry no signature, so they are never accepted.
 	 *
-	 * @param array<string, mixed> $webhook   The decoded body.
+	 * @param array<string, mixed> $webhook   The decoded body, as received.
 	 * @param string               $signature The `x-signature` header.
 	 * @return bool
 	 */

@@ -65,6 +65,20 @@ function hesabe_wc_declare_compatibility() {
 }
 
 /**
+ * One value of a decoded JSON document, as plain text.
+ *
+ * Hesabe's webhook, the customer's return and Hesabe's answers all arrive as JSON, and
+ * json_decode() sanitises nothing. Every value the plugin keeps, compares or writes into an
+ * order note passes through here first.
+ *
+ * @param mixed $value A decoded value.
+ * @return string The value as sanitised text, or '' when it is not a scalar.
+ */
+function hesabe_wc_text( $value ) {
+	return is_scalar( $value ) ? sanitize_text_field( (string) $value ) : '';
+}
+
+/**
  * Bootstrap gateway after WooCommerce loads.
  */
 function hesabe_wc_init() {
