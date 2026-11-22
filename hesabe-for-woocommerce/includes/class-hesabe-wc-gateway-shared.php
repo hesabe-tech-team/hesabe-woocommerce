@@ -359,39 +359,41 @@ class Hesabe_WC_Return_Handler {
 			exit;
 		}
 
-		$json = json_decode( $decrypted );
-		if ( ! $json || ! isset( $json->response ) ) {
+		$fields = self::return_fields( json_decode( $decrypted, true, 512, JSON_BIGINT_AS_STRING ) );
+		if ( null === $fields ) {
 			wc_add_notice( $message, $msg_class );
 			wp_safe_redirect( wc_get_checkout_url() );
 			exit;
 		}
 
-		$info     = $json->response;
-		$order_id = isset( $info->variable1 ) ? absint( $info->variable1 ) : 0;
+		$order_id = $fields['order_id'];
 		$order    = $order_id ? wc_get_order( $order_id ) : false;
 
-		if ( ! $order ) {
+		$ok = $fields['succeeded']
+			&& in_array( $fields['result'], array( 'CAPTURED', 'ACCEPT', 'AUTHORIZED', 'PARTIALLY_CAPTURED', 'SUCCESS' ), true );
+		if ( $ok ) {
+			// Shown until Hesabe confirms the payment: a return alone never marks an order paid.
+			$msg_class = 'notice';
+			$message   = __( 'Thank you. Your payment is being confirmed, and your order will be updated as soon as Hesabe confirms it.', 'hesabe-for-woocommerce' );
+		}
+
+		// Anyone can open this address, and the sandbox keys that decrypt a return are public.
+		// So a return that names an order paid another way, or that is not the order's own,
+		// changes nothing, leaves no note, and is not sent on to the order's page, whose
+		// address holds the order key.
+		if ( ! $order || ! Hesabe_WC_Settlement::is_hesabe_order( $order ) || ! self::is_own_return( $order, $fields['token'] ) ) {
 			wc_add_notice( $message, $msg_class );
 			wp_safe_redirect( wc_get_checkout_url() );
 			exit;
 		}
 
-		$order_status = isset( $info->resultCode ) ? (string) $info->resultCode : '';
-		$order->add_order_note(
-			sprintf(
-				'Hesabe return: %s | amount: %s',
-				$order_status,
-				isset( $info->amount ) ? (string) $info->amount : ''
-			)
-		);
+		$order->add_order_note( sprintf( 'Hesabe return: %s | amount: %s', $fields['result'], $fields['amount'] ) );
 
-		$ok = ! empty( $json->status )
-			&& in_array( $order_status, array( 'CAPTURED', 'ACCEPT', 'AUTHORIZED', 'PARTIALLY_CAPTURED', 'SUCCESS' ), true );
-
-		// The return decides an order still awaiting payment. An order the webhook settled
-		// first is checked again with the Transaction Enquiry, and a failed return never
-		// changes a paid order, so the customer's page follows Hesabe's latest status.
-		$paid = Hesabe_WC_Settlement::from_return( $order_id, $ok, $info );
+		// The return comes first, but Hesabe decides: a return that reports a payment asks the
+		// Transaction Enquiry, and the order is paid when Hesabe confirms it for one of the
+		// order's own checkouts and for the order's amount. A failed return never changes a
+		// paid order, so the customer's page follows Hesabe's latest status.
+		$paid = Hesabe_WC_Settlement::from_return( $order_id, $ok );
 
 		if ( $paid ) {
 			$msg_class = 'success';
@@ -425,6 +427,63 @@ class Hesabe_WC_Return_Handler {
 			wp_safe_redirect( wc_get_checkout_url() );
 		}
 		exit;
+	}
+
+	/**
+	 * The fields of a decrypted return the plugin acts on, each sanitised.
+	 *
+	 * Decrypting the return shows that it was encrypted with the merchant's keys; json_decode()
+	 * sanitises nothing. The rest of the return, the customer's details included, goes no
+	 * further.
+	 *
+	 * @param mixed $json The decoded return.
+	 * @return array{order_id:int,succeeded:bool,result:string,amount:string,token:string}|null
+	 *         Null when it is not a return.
+	 */
+	private static function return_fields( $json ) {
+		if ( ! is_array( $json ) || ! isset( $json['response'] ) || ! is_array( $json['response'] ) ) {
+			return null;
+		}
+		$response = $json['response'];
+		$text     = function ( $name ) use ( $response ) {
+			return hesabe_wc_text( isset( $response[ $name ] ) ? $response[ $name ] : '' );
+		};
+		return array(
+			'order_id'  => absint( $text( 'variable1' ) ),
+			'succeeded' => ! empty( $json['status'] ),
+			'result'    => $text( 'resultCode' ),
+			'amount'    => $text( 'amount' ),
+			'token'     => $text( 'paymentToken' ),
+		);
+	}
+
+	/**
+	 * Whether a return is the order's own: it names one of the order's checkouts, or the visitor
+	 * is the customer who placed the order.
+	 *
+	 * A KNET or card return carries its checkout's token as `paymentToken` (sandbox, November
+	 * 2026), which only Hesabe, the shop and that checkout's customer have seen. An Apple Pay
+	 * return may carry none (a Direct Apple Pay return had none, production, September 2026),
+	 * so the customer is also recognised by their login, or by the order WooCommerce keeps in
+	 * their session while it awaits payment.
+	 *
+	 * Called before the order is settled: WooCommerce clears the session's order when it
+	 * completes a payment.
+	 *
+	 * @param WC_Order $order Order the return names.
+	 * @param string   $token The return's `paymentToken`, sanitised.
+	 * @return bool
+	 */
+	private static function is_own_return( WC_Order $order, $token ) {
+		if ( Hesabe_WC_Settlement::started_checkout( $order, $token ) ) {
+			return true;
+		}
+		$customer_id = (int) $order->get_customer_id();
+		if ( $customer_id > 0 && get_current_user_id() === $customer_id ) {
+			return true;
+		}
+		$session = function_exists( 'WC' ) && WC() ? WC()->session : null;
+		return is_object( $session ) && absint( $session->get( 'order_awaiting_payment' ) ) === $order->get_id();
 	}
 }
 
@@ -505,16 +564,17 @@ trait Hesabe_WC_Gateway_Shared {
 		}
 
 		if ( empty( $result->status ) || (int) $result->status !== 1 || empty( $result->response->data ) ) {
-			$code    = isset( $result->code )    ? (string) $result->code    : '';
-			$message = isset( $result->message ) ? (string) $result->message : __( 'Unknown error', 'hesabe-for-woocommerce' );
+			// Hesabe's answer is decoded JSON, so each value is sanitised before it is kept or shown.
+			$code    = isset( $result->code ) ? hesabe_wc_text( $result->code ) : '';
+			$message = isset( $result->message ) ? hesabe_wc_text( $result->message ) : __( 'Unknown error', 'hesabe-for-woocommerce' );
 			$order->add_order_note(
 				sprintf(
 					'Hesabe checkout failed — status: %s | code: %s | message: %s | paymentType: %s | raw: %s',
-					isset( $result->status ) ? (string) $result->status : '',
+					isset( $result->status ) ? hesabe_wc_text( $result->status ) : '',
 					$code,
 					$message,
 					$payment_type,
-					wp_json_encode( $result )
+					hesabe_wc_text( wp_json_encode( $result ) )
 				)
 			);
 			/* translators: 1: Hesabe's error code, 2: Hesabe's error message */

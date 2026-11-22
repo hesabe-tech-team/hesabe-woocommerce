@@ -576,9 +576,10 @@ class Hesabe_WC_Gateway extends WC_Payment_Gateway {
 		}
 
 		if ( empty( $result->status ) || (int) $result->status !== 1 || empty( $result->response->data ) ) {
-			$code    = isset( $result->code )    ? (string) $result->code    : '';
-			$msg     = isset( $result->message ) ? (string) $result->message : 'Apple Pay could not start.';
-			$status  = isset( $result->status )  ? (string) $result->status  : '';
+			// Hesabe's answer is decoded JSON, so each value is sanitised before it is kept or shown.
+			$code   = isset( $result->code ) ? hesabe_wc_text( $result->code ) : '';
+			$msg    = isset( $result->message ) ? hesabe_wc_text( $result->message ) : 'Apple Pay could not start.';
+			$status = isset( $result->status ) ? hesabe_wc_text( $result->status ) : '';
 
 			// Full response to order notes for admin diagnosis.
 			$order->add_order_note(
@@ -588,7 +589,7 @@ class Hesabe_WC_Gateway extends WC_Payment_Gateway {
 					$code,
 					$msg,
 					$payment_type,
-					wp_json_encode( $result )
+					hesabe_wc_text( wp_json_encode( $result ) )
 				)
 			);
 			$order->save();
