@@ -4,7 +4,7 @@ Tags: payment gateway, knet, kuwait, apple pay, woocommerce
 Requires at least: 5.8
 Tested up to: 7.1
 Requires PHP: 7.4
-Stable tag: 11.2.2
+Stable tag: 11.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -114,9 +114,13 @@ The message, and the order note, give Hesabe's reason. For example, Hesabe refus
 
 = Which versions was it tested with? =
 
-Against Hesabe's sandbox in November 2026, with KNET and Visa / Mastercard in Hosted and Direct mode, on the Checkout block and the classic checkout: WordPress 7.1.4 with WooCommerce 11.3.0 and 11.2.2 on PHP 8.5, and WordPress 6.9.4 with WooCommerce 10.7.0 on PHP 8.3.
+Against Hesabe's sandbox in November 2026, with KNET and Visa / Mastercard in Hosted and Direct mode, on the Checkout block and the classic checkout: WooCommerce 11.3.1 on WordPress 7.1.5 and PHP 8.5. Payments were also checked with WooCommerce 11.2.2 on WordPress 7.1.4 and PHP 8.5, and with WooCommerce 10.7.0 on WordPress 6.9.4 and PHP 8.3.
 
 == Changelog ==
+
+= 11.3.1 =
+* Tested with WooCommerce 11.3.1 and WordPress 7.1.5.
+* The constants `WC_HESABE_TEST_URL` and `WC_HESABE_LIVE_URL` are removed, because they did not start with the plugin's prefix. Payments work as before.
 
 = 11.2.2 =
 * The customer's return no longer marks an order paid by itself: the plugin confirms the payment with Hesabe's Transaction Enquiry first, for one of the order's own checkouts and for the order's amount.
