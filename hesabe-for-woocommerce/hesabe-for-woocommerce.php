@@ -31,9 +31,6 @@ define( 'HESABE_WC_URL', plugin_dir_url( __FILE__ ) );
  */
 define( 'HESABE_WC_SANDBOX_BASE_URL', 'https://sandbox.hesabe.com' );
 define( 'HESABE_WC_PRODUCTION_BASE_URL', 'https://api.hesabe.com' );
-// Legacy aliases kept for compatibility with older Hesabe integrations.
-define( 'WC_HESABE_TEST_URL', HESABE_WC_SANDBOX_BASE_URL );
-define( 'WC_HESABE_LIVE_URL', HESABE_WC_PRODUCTION_BASE_URL );
 define( 'HESABE_WC_SANDBOX_APPLE_DOMAIN', 'test-woocommerce.hesabe.com' );
 define( 'HESABE_WC_SANDBOX_MERCHANT_CODE', '842217' );
 define( 'HESABE_WC_SANDBOX_ACCESS_CODE', 'c333729b-d060-4b74-a49d-7686a8353481' );
