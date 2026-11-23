@@ -110,14 +110,14 @@ class Hesabe_WC_Config {
 		$env = isset( $s['environment'] ) ? $s['environment'] : 'sandbox';
 
 		if ( 'sandbox' === $env ) {
-			$base = defined( 'WC_HESABE_TEST_URL' ) ? WC_HESABE_TEST_URL : HESABE_WC_SANDBOX_BASE_URL;
+			$base = HESABE_WC_SANDBOX_BASE_URL;
 			// Fall back to built-in sandbox constants when the saved value is empty.
 			$mc = ! empty( $s['sandbox_merchant_code'] ) ? $s['sandbox_merchant_code'] : HESABE_WC_SANDBOX_MERCHANT_CODE;
 			$ac = ! empty( $s['sandbox_access_code'] )   ? $s['sandbox_access_code']   : HESABE_WC_SANDBOX_ACCESS_CODE;
 			$sk = ! empty( $s['sandbox_secret_key'] )    ? $s['sandbox_secret_key']    : HESABE_WC_SANDBOX_SECRET_KEY;
 			$iv = ! empty( $s['sandbox_iv_key'] )        ? $s['sandbox_iv_key']        : HESABE_WC_SANDBOX_IV_KEY;
 		} else {
-			$base = defined( 'WC_HESABE_LIVE_URL' ) ? WC_HESABE_LIVE_URL : HESABE_WC_PRODUCTION_BASE_URL;
+			$base = HESABE_WC_PRODUCTION_BASE_URL;
 			$mc   = isset( $s['production_merchant_code'] ) ? $s['production_merchant_code'] : '';
 			$ac   = isset( $s['production_access_code'] )   ? $s['production_access_code']   : '';
 			$sk   = isset( $s['production_secret_key'] )    ? $s['production_secret_key']    : '';

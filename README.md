@@ -11,7 +11,7 @@ plugin calls.
 
 ## Plugin Version
 
-- Current plugin version: `11.2.2`
+- Current plugin version: `11.3.1`
 
 ## Compatibility / Supported Versions
 
@@ -26,7 +26,10 @@ Based on plugin metadata and code:
 Tested against the Hesabe sandbox in November 2026, with KNET and Visa / Mastercard in
 Hosted and Direct mode, on the Checkout block and the classic checkout:
 
-- WordPress `7.1.4`, WooCommerce `11.3.0`, PHP `8.5`
+- WordPress `7.1.5`, WooCommerce `11.3.1`, PHP `8.5`
+
+Payments were also checked with:
+
 - WordPress `7.1.4`, WooCommerce `11.2.2`, PHP `8.5`
 - WordPress `6.9.4`, WooCommerce `10.7.0`, PHP `8.3`
 
